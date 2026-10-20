@@ -36,8 +36,8 @@ folder `licenses/`.
 - Lisensi: **Apache License 2.0**. Teks: `licenses/Apache-2.0.txt`.
 - Sumber: <https://opencv.org/> dan
   <https://github.com/opencv/opencv-python>.
-- Pembungkus `opencv-python-headless` memakai lisensi MIT; lihat berkas
-  `LICENSE.txt` di paket tersebut.
+- Pembungkus `opencv-python-headless` memakai lisensi MIT. Teksnya:
+  `licenses/opencv-python-MIT.txt`.
 
 ## NumPy
 
