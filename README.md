@@ -18,7 +18,7 @@ Aset rilis tersedia di halaman **Releases** repositori ini:
 
 Ekstrak arsip, lalu jalankan `Frame Extractor` (Windows: `Frame Extractor.exe`). Tidak perlu memasang Python atau ffmpeg. Biner belum ditandatangani secara digital; Windows SmartScreen dapat meminta konfirmasi. Verifikasi unduhan dengan `SHA256SUMS.txt`.
 
-Status build lokal Windows: `--onedir` 572,9 MiB (ZIP 241,9 MB) dan `--onefile` 229,8 MiB (ZIP 240,2 MB). Linux dan macOS dibangun oleh workflow rilis; lihat `RELEASE-CHECKLIST.md` untuk status pengujian tiap sistem.
+Status build lokal Windows: `--onedir` 572,9 MiB (ZIP 241,9 MB) dan `--onefile` 229,8 MiB (ZIP 240,2 MB). Linux dan macOS dibangun oleh workflow rilis.
 
 ## Pakai dalam tiga langkah
 

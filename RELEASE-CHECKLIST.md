@@ -58,15 +58,15 @@ python build/package.py
 | Artefak | Ukuran |
 |---|---|
 | `dist/Frame Extractor/` (`--onedir`) | 600.708.179 byte (572,9 MiB) |
-| `dist-release/frame-extractor-windows-x64.zip` | 241.905.249 byte (241,9 MB) |
+| `dist-release/frame-extractor-windows-x64.zip` | 241.905.213 byte (241,9 MB) |
 | `dist-onefile/Frame Extractor.exe` | 240.915.074 byte (229,8 MiB) |
-| `dist-release/frame-extractor-windows-x64-onefile.zip` | 240.152.913 byte (240,2 MB) |
+| `dist-release/frame-extractor-windows-x64-onefile.zip` | 240.152.877 byte (240,2 MB) |
 
 Checksum SHA-256 build lokal:
 
 ```text
-116be81629f331d9b259c453a852bc2d3055d46afc9c4feaaba66d7227307d15  frame-extractor-windows-x64.zip
-70646b24afcb8d62323ffc8739349152649ee6b1410f3a23f216de72d81d1ca8  frame-extractor-windows-x64-onefile.zip
+5852dc0023bf865f9721e0cb38ad779cfb1962cc19beae6f7eae5c966d7bf99e  frame-extractor-windows-x64.zip
+90e8342f3a8f77ce457016fe196be1739706279b81554d8ef64ba801e2e44d31  frame-extractor-windows-x64-onefile.zip
 ```
 
 Checksum ini hanya berlaku untuk ZIP lokal tanggal 21 Oktober 2026. Build CI
@@ -87,8 +87,9 @@ Bukti menjalankan biner:
       3 PNG dan smoke test keluar 0.
 - [x] Ikon tertanam pada kedua executable (32×32) dan metadata versi
       `FileVersion`/`ProductVersion` = `1.0.0`.
-- [ ] Ikon terlihat benar di taskbar Windows secara visual. **BELUM** —
-      hanya diverifikasi tidak langsung lewat ikon executable/jendela.
+- [x] Ikon terlihat benar di taskbar Windows secara visual — diperiksa dari
+      tangkapan layar desktop native pada 21 Oktober 2026; ikon aplikasi tampil
+      di taskbar, bukan ikon Python.
 - [ ] Dijalankan di mesin bersih tanpa Python terpasang oleh penguji manusia.
       **BELUM** — pengujian di atas memakai VM yang sama, meski `PATH` sudah
       dibatasi.
@@ -106,6 +107,10 @@ Bukti menjalankan biner:
 - [x] Video rusak menampilkan galat yang dapat dibaca (tes otomatis CLI/probe).
 - [x] Folder keluaran tanpa izin tulis ditolak dengan galat (tes otomatis).
 - [ ] Antrean batch 5 berkas diuji manual. **BELUM**.
+- [ ] Seluruh alur diselesaikan hanya dengan keyboard (urutan Tab, fokus,
+      pintasan). **BELUM** — implementasi ada, verifikasi manual penuh belum.
+- [ ] Tujuh keadaan pada bagian 5.2 spesifikasi diuji manual satu per satu.
+      **BELUM** — sebagian tercakup tes otomatis.
 - [ ] SmartScreen/Defender di mesin bersih. **BELUM**.
 - [ ] Biner ditandatangani code-signing. **BELUM**.
 
