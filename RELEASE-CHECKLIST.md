@@ -39,6 +39,8 @@ Tag target: `v1.0.0` (belum dibuat)
 - [x] `python -m ruff check src tests tools` — tidak ada temuan.
 - [x] Uji GUI sumber (`tools/gui_smoke.py` melalui pytest): 10 item galeri dan
       10 berkas PNG dari video uji 10 detik.
+- [x] Simulasi tanpa ffmpeg (folder `third_party/ffmpeg/bin` dinonaktifkan):
+      97 tes, 8 dilewati, 89 lulus; jalur OpenCV termasuk GUI tetap bekerja.
 - [x] Konfigurasi `.github/workflows/release.yml` lolos parse YAML lokal.
 - [ ] Workflow GitHub Actions benar-benar dijalankan pada Linux/macOS.
       **BELUM** — belum ada repositori/runner/kredensial GitHub.
