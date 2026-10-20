@@ -1,0 +1,75 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frame-extractor"
+dynamic = ["version"]
+description = "Ekstrak frame dari video tanpa terminal, dengan GUI dan CLI."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Frame Extractor contributors" }]
+keywords = ["video", "frames", "screenshot", "ffmpeg", "pyside6"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Video",
+]
+dependencies = [
+    "PySide6>=6.6",
+    "opencv-python-headless>=4.8",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8",
+    "pytest-cov>=5",
+    "ruff>=0.6",
+    "pillow>=10",
+    "pyinstaller>=6.6",
+]
+
+[project.scripts]
+frame-extractor = "frame_extractor.app:main"
+frame-extractor-cli = "frame_extractor.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/example/frame-extractor"
+
+[tool.setuptools.dynamic]
+version = { attr = "frame_extractor.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+frame_extractor = ["ui/theme.qss", "assets/*.png", "assets/*.ico"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: menjalankan ffmpeg/OpenCV pada video uji sintetis",
+    "gui: membutuhkan Qt (mode offscreen)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]
+"tools/*" = ["T201"]
