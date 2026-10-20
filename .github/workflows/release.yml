@@ -1,0 +1,335 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+  FFMPEG_WIN_URL: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-lgpl-shared-8.1.zip"
+  FFMPEG_LINUX_URL: "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-linux64-lgpl-8.1.tar.xz"
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64
+            os: windows-latest
+            artifact: windows-x64
+          - name: Linux x64
+            os: ubuntu-22.04
+            artifact: linux-x64
+          - name: macOS arm64
+            os: macos-14
+            artifact: macos-arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Siapkan Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Pasang dependensi
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Siapkan ffmpeg LGPL (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $archive = Join-Path $env:RUNNER_TEMP "ffmpeg-lgpl.zip"
+          $extract = Join-Path $env:RUNNER_TEMP "ffmpeg-lgpl"
+          Invoke-WebRequest -Uri "$env:FFMPEG_WIN_URL" -OutFile $archive
+          Expand-Archive -Path $archive -DestinationPath $extract -Force
+          $root = Get-ChildItem -Path $extract -Directory | Select-Object -First 1
+          if (-not $root) { throw "Arsip ffmpeg tidak berisi folder build." }
+          $bin = Join-Path $root.FullName "bin"
+          New-Item -ItemType Directory -Force -Path "third_party/ffmpeg/bin" | Out-Null
+          Copy-Item (Join-Path $bin "ffmpeg.exe") "third_party/ffmpeg/bin/"
+          Copy-Item (Join-Path $bin "ffprobe.exe") "third_party/ffmpeg/bin/"
+          Copy-Item (Join-Path $bin "*.dll") "third_party/ffmpeg/bin/"
+          Copy-Item (Join-Path $root.FullName "LICENSE.txt") `
+            "third_party/ffmpeg/bin/FFMPEG-LICENSE.txt"
+          & "third_party/ffmpeg/bin/ffmpeg.exe" -version | Select-Object -First 1
+
+      - name: Siapkan ffmpeg LGPL (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb libegl1 libgl1 libglib2.0-0 libfontconfig1 libdbus-1-3 \
+            libxkbcommon-x11-0 libx11-xcb1 libxrender1 libxi6 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+            libxcb-randr0 libxcb-render0 libxcb-render-util0 libxcb-shape0 \
+            libxcb-shm0 libxcb-sync1 libxcb-util1 libxcb-xfixes0 \
+            libxcb-xinerama0 libxcb-xinput0 libxcb-xkb1 libxcb-xtest0
+          archive="$RUNNER_TEMP/ffmpeg-lgpl.tar.xz"
+          curl -fsSL "$FFMPEG_LINUX_URL" -o "$archive"
+          mkdir -p "$RUNNER_TEMP/ffmpeg-lgpl" third_party/ffmpeg/bin
+          tar -xJf "$archive" -C "$RUNNER_TEMP/ffmpeg-lgpl"
+          root="$(find "$RUNNER_TEMP/ffmpeg-lgpl" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          install -m 0755 "$root/bin/ffmpeg" third_party/ffmpeg/bin/ffmpeg
+          install -m 0755 "$root/bin/ffprobe" third_party/ffmpeg/bin/ffprobe
+          cp "$root/LICENSE.txt" third_party/ffmpeg/bin/FFMPEG-LICENSE.txt
+          third_party/ffmpeg/bin/ffmpeg -version | head -n 1
+
+      - name: Siapkan fallback OpenCV (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          # Rilis macOS memakai mesin OpenCV; tetap buat folder agar spec PyInstaller valid.
+          mkdir -p third_party/ffmpeg/bin
+          ls -la third_party/ffmpeg/bin
+
+      - name: Periksa gaya kode
+        if: runner.os == 'Linux'
+        run: python -m ruff check src tests tools
+
+      - name: Jalankan tes
+        run: python -m pytest -q
+
+      - name: Bangun onedir
+        run: >-
+          python -m PyInstaller --noconfirm --clean
+          --distpath dist --workpath build/work build/frame_extractor.spec
+
+      - name: Bangun onefile (Windows)
+        if: runner.os == 'Windows'
+        run: >-
+          python -m PyInstaller --noconfirm --clean
+          --distpath dist-onefile --workpath build/work-onefile
+          build/frame_extractor_onefile.spec
+
+      - name: Uji biner (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          python tools/make_test_video.py release-smoke/sample.mp4
+          $exe = Join-Path (Get-Location) "dist\Frame Extractor\Frame Extractor.exe"
+          $out = Join-Path (Get-Location) "release-smoke\onedir-out"
+          $arguments = @("--self-test", "release-smoke\sample.mp4", "--out", "release-smoke\onedir-out")
+          $process = Start-Process -FilePath $exe -ArgumentList $arguments `
+            -WorkingDirectory (Get-Location) -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            throw "Self-test onedir gagal dengan kode $($process.ExitCode)."
+          }
+          $count = @(Get-ChildItem -Path $out -Filter "*.png").Count
+          if ($count -ne 3) { throw "Self-test menghasilkan $count berkas, seharusnya 3." }
+          $smoke = Start-Process -FilePath $exe -ArgumentList @("--smoke-test") `
+            -WorkingDirectory (Get-Location) -Wait -PassThru
+          if ($smoke.ExitCode -ne 0) {
+            throw "Smoke test onedir gagal dengan kode $($smoke.ExitCode)."
+          }
+          $onefile = Join-Path (Get-Location) "dist-onefile\Frame Extractor.exe"
+          $oneOut = Join-Path (Get-Location) "release-smoke\onefile-out"
+          $oneArgs = @("--self-test", "release-smoke\sample.mp4", "--out", "release-smoke\onefile-out")
+          $oneProcess = Start-Process -FilePath $onefile -ArgumentList $oneArgs `
+            -WorkingDirectory (Get-Location) -Wait -PassThru
+          if ($oneProcess.ExitCode -ne 0) {
+            throw "Self-test onefile gagal dengan kode $($oneProcess.ExitCode)."
+          }
+          $oneCount = @(Get-ChildItem -Path $oneOut -Filter "*.png").Count
+          if ($oneCount -ne 3) { throw "Onefile menghasilkan $oneCount berkas, seharusnya 3." }
+          $oneSmoke = Start-Process -FilePath $onefile -ArgumentList @("--smoke-test") `
+            -WorkingDirectory (Get-Location) -Wait -PassThru
+          if ($oneSmoke.ExitCode -ne 0) {
+            throw "Smoke test onefile gagal dengan kode $($oneSmoke.ExitCode)."
+          }
+
+      - name: Uji biner (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/make_test_video.py release-smoke/sample.mp4
+          exe="dist/Frame Extractor/Frame Extractor"
+          QT_QPA_PLATFORM=offscreen "$exe" --self-test release-smoke/sample.mp4 \
+            --out release-smoke/onedir-out
+          test "$(find release-smoke/onedir-out -name '*.png' | wc -l)" -eq 3
+          xvfb-run -a -s "-screen 0 1280x800x24" "$exe" --smoke-test
+
+      - name: Uji biner (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/make_test_video.py release-smoke/sample.mp4
+          exe="dist/Frame Extractor.app/Contents/MacOS/Frame Extractor"
+          QT_QPA_PLATFORM=offscreen "$exe" --self-test release-smoke/sample.mp4 \
+            --out release-smoke/onedir-out
+          test "$(find release-smoke/onedir-out -name '*.png' | wc -l)" -eq 3
+          QT_QPA_PLATFORM=offscreen "$exe" --smoke-test
+
+      - name: Paketkan aset
+        run: python build/package.py
+
+      - name: Periksa isi paket
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -lh dist-release
+          for asset in dist-release/frame-extractor-*; do
+            test -s "$asset"
+          done
+          cd dist-release
+          sha256sum -c SHA256SUMS.txt
+
+      - name: Unggah artefak
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.artifact }}
+          path: dist-release/frame-extractor-*
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Buat draf rilis
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Siapkan Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Periksa versi dengan tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import re
+          import sys
+          from pathlib import Path
+
+          init = Path("src/frame_extractor/__init__.py").read_text(encoding="utf-8")
+          match = re.search(r'__version__\s*=\s*"([^"]+)"', init)
+          if match is None:
+              sys.exit("__version__ tidak ditemukan.")
+          version = match.group(1)
+          tag = os.environ.get("GITHUB_REF_NAME", "")
+          if tag != f"v{version}":
+              sys.exit(f"Tag {tag!r} tidak cocok dengan versi {version!r}.")
+
+          checks = {
+              "build/version_info.txt": f"FileVersion', '{version}'",
+              "build/frame_extractor.spec": f'CFBundleShortVersionString": "{version}"',
+          }
+          for path, expected in checks.items():
+              if expected not in Path(path).read_text(encoding="utf-8"):
+                  sys.exit(f"{path} tidak memuat versi {version}.")
+          print(f"Versi {version} cocok dengan tag {tag}.")
+          PY
+
+      - name: Unduh artefak
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Buat checksum gabungan
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import sys
+          from pathlib import Path
+
+          release = Path("release")
+          expected = {
+              "frame-extractor-windows-x64.zip",
+              "frame-extractor-windows-x64-onefile.zip",
+              "frame-extractor-linux-x64.tar.gz",
+              "frame-extractor-macos-arm64.zip",
+          }
+          assets = sorted(path for path in release.iterdir() if path.is_file())
+          names = {path.name for path in assets}
+          if names != expected:
+              sys.exit(f"Aset tidak lengkap. Ditemukan: {sorted(names)}")
+
+          lines = []
+          for path in assets:
+              digest = hashlib.sha256()
+              with path.open("rb") as handle:
+                  for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+                      digest.update(chunk)
+              lines.append(f"{digest.hexdigest()}  {path.name}")
+          (release / "SHA256SUMS.txt").write_text(
+              "\n".join(lines) + "\n", encoding="utf-8"
+          )
+          print("\n".join(lines))
+          PY
+          cd release
+          sha256sum -c SHA256SUMS.txt
+          ls -lh
+
+      - name: Publikasikan draf rilis
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Frame Extractor ${{ github.ref_name }}
+          draft: true
+          prerelease: false
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release/*
+          body: |
+            ## Unduhan
+
+            | Platform | Berkas |
+            |---|---|
+            | Windows x64 | `frame-extractor-windows-x64.zip` (utama, `--onedir`) |
+            | Windows x64 | `frame-extractor-windows-x64-onefile.zip` (alternatif satu berkas) |
+            | Linux x64 | `frame-extractor-linux-x64.tar.gz` |
+            | macOS arm64 | `frame-extractor-macos-arm64.zip` |
+
+            Semua arsip menyertakan `README.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`,
+            dan folder `licenses/`. Rilis Windows dan Linux menyertakan ffmpeg LGPL;
+            rilis macOS memakai mesin OpenCV.
+
+            ## Instalasi
+
+            1. Unduh arsip sesuai platform, lalu ekstrak ke folder yang dapat ditulis.
+            2. Jalankan `Frame Extractor` (Windows: `Frame Extractor.exe`).
+            3. Verifikasi unduhan dari folder yang sama:
+               - Linux/macOS: `sha256sum -c SHA256SUMS.txt`
+               - Windows: `Get-FileHash <berkas> -Algorithm SHA256`
+
+            ## Catatan
+
+            - Biner belum ditandatangani. Windows SmartScreen dan Gatekeeper macOS
+              dapat meminta konfirmasi; ini normal untuk build komunitas.
+            - macOS belum di-notarize. Buka dengan klik kanan > **Open** bila perlu.
+            - Aplikasi berjalan tanpa internet dan tidak mengirim telemetri.
+            - Daftar perubahan disusun otomatis dari riwayat commit di bawah.
