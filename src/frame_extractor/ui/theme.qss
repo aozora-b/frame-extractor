@@ -1,0 +1,437 @@
+/* Stylesheet Frame Extractor. Token palet diganti oleh ui/theme.py. */
+
+* {
+    font-family: "Segoe UI", "Inter", "Noto Sans", sans-serif;
+    font-size: 13px;
+    outline: none;
+}
+
+QMainWindow, QWidget#Root, QDialog {
+    background: $bg;
+    color: $text;
+}
+
+QLabel {
+    color: $text;
+    background: transparent;
+}
+
+QLabel#Muted, QLabel#Subtitle, QLabel#StatCaption {
+    color: $muted;
+}
+
+QLabel#BrandTitle {
+    font-size: 18px;
+    font-weight: 700;
+}
+
+QLabel#SectionTitle {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+QLabel#StatValue {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QLabel#EstimateNumber {
+    font-size: 28px;
+    font-weight: 700;
+    color: $accent;
+}
+
+QLabel#Warning {
+    background: $warning_bg;
+    color: $warning;
+    border: 1px solid $warning;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+QLabel#InlineError {
+    background: $danger_bg;
+    color: $danger;
+    border: 1px solid $danger;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+QLabel#SuccessText {
+    color: $success;
+}
+
+QFrame#Header {
+    background: $bg;
+    border-bottom: 1px solid $border;
+}
+
+QFrame#Card {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 12px;
+}
+
+QFrame#Footer {
+    background: $surface;
+    border-top: 1px solid $border;
+}
+
+QFrame#Separator {
+    background: $border;
+    max-height: 1px;
+    min-height: 1px;
+    border: none;
+}
+
+QFrame#DropZone {
+    background: $surface;
+    border: 2px dashed $border;
+    border-radius: 16px;
+}
+
+QFrame#DropZone[dragActive="true"] {
+    background: $surface_alt;
+    border: 2px dashed $accent;
+}
+
+QFrame#DropZone:focus {
+    border: 2px solid $focus;
+}
+
+QPushButton {
+    background: $surface_alt;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 8px;
+    padding: 6px 14px;
+    min-height: 32px;
+}
+
+QPushButton:hover {
+    background: $elevated;
+    border-color: $accent;
+}
+
+QPushButton:pressed {
+    background: $border;
+}
+
+QPushButton:focus {
+    border: 2px solid $focus;
+}
+
+QPushButton:disabled {
+    color: $muted;
+    background: $surface;
+    border-color: $border;
+}
+
+QPushButton#Primary {
+    background: $accent;
+    color: $accent_text;
+    border: 2px solid $accent;
+    font-weight: 600;
+    min-height: 44px;
+}
+
+QPushButton#Primary:hover {
+    background: $accent_hover;
+    border-color: $accent_hover;
+}
+
+QPushButton#Primary:focus {
+    border: 2px solid $focus;
+}
+
+QPushButton#Primary:disabled {
+    background: $progress_bg;
+    border-color: $progress_bg;
+    color: $muted;
+}
+
+QPushButton#Danger {
+    color: $danger;
+    border-color: $danger;
+    background: transparent;
+}
+
+QPushButton#Danger:hover {
+    background: $danger_bg;
+}
+
+QPushButton#Link {
+    background: transparent;
+    border: none;
+    color: $accent;
+    padding: 4px 6px;
+    min-height: 24px;
+    text-align: left;
+}
+
+QPushButton#Link:hover {
+    color: $accent_hover;
+    text-decoration: underline;
+}
+
+QToolButton {
+    background: transparent;
+    color: $text;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 2px 8px;
+}
+
+QToolButton:hover {
+    background: $surface_alt;
+    border-color: $border;
+}
+
+QToolButton:focus {
+    border: 2px solid $focus;
+}
+
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+    background: $surface_alt;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 8px;
+    padding: 5px 8px;
+    min-height: 26px;
+    selection-background-color: $selection;
+    selection-color: $text;
+}
+
+QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus {
+    border: 2px solid $focus;
+}
+
+QLineEdit:disabled, QSpinBox:disabled, QDoubleSpinBox:disabled, QComboBox:disabled {
+    color: $muted;
+    background: $surface;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 24px;
+}
+
+QComboBox QAbstractItemView {
+    background: $surface;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 8px;
+    selection-background-color: $selection;
+    selection-color: $text;
+    padding: 4px;
+}
+
+QSlider::groove:horizontal {
+    height: 6px;
+    background: $progress_bg;
+    border-radius: 3px;
+}
+
+QSlider::sub-page:horizontal {
+    background: $accent;
+    border-radius: 3px;
+}
+
+QSlider::handle:horizontal {
+    background: $text;
+    width: 16px;
+    height: 16px;
+    margin: -6px 0;
+    border-radius: 8px;
+}
+
+QSlider::handle:horizontal:focus {
+    border: 2px solid $focus;
+}
+
+QProgressBar {
+    background: $progress_bg;
+    border: none;
+    border-radius: 4px;
+    min-height: 8px;
+    max-height: 8px;
+    text-align: center;
+    color: transparent;
+}
+
+QProgressBar::chunk {
+    background: $accent;
+    border-radius: 4px;
+}
+
+QListView {
+    background: transparent;
+    border: none;
+    color: $text;
+}
+
+QListView#Gallery {
+    background: $surface;
+    border: 1px solid $border;
+    border-radius: 12px;
+    padding: 10px;
+}
+
+QListView#Gallery::item {
+    border-radius: 8px;
+    padding: 6px;
+    color: $text;
+}
+
+QListView#Gallery::item:hover {
+    background: $surface_alt;
+}
+
+QListView#Gallery::item:selected {
+    background: $selection;
+    color: $text;
+}
+
+QListView#Queue {
+    background: transparent;
+    border: none;
+}
+
+QScrollBar:vertical {
+    background: transparent;
+    width: 12px;
+    margin: 2px;
+}
+
+QScrollBar::handle:vertical {
+    background: $border;
+    min-height: 28px;
+    border-radius: 5px;
+}
+
+QScrollBar::handle:vertical:hover {
+    background: $muted;
+}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical,
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {
+    background: none;
+    height: 0;
+}
+
+QScrollBar:horizontal {
+    background: transparent;
+    height: 12px;
+    margin: 2px;
+}
+
+QScrollBar::handle:horizontal {
+    background: $border;
+    min-width: 28px;
+    border-radius: 5px;
+}
+
+QMenuBar {
+    background: $bg;
+    color: $text;
+    border-bottom: 1px solid $border;
+}
+
+QMenuBar::item {
+    background: transparent;
+    padding: 5px 10px;
+}
+
+QMenuBar::item:selected {
+    background: $surface_alt;
+    border-radius: 6px;
+}
+
+QMenu {
+    background: $surface;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 8px;
+    padding: 6px;
+}
+
+QMenu::item {
+    padding: 6px 24px 6px 12px;
+    border-radius: 6px;
+}
+
+QMenu::item:selected {
+    background: $selection;
+}
+
+QMenu::item:disabled {
+    color: $muted;
+}
+
+QMenu::separator {
+    height: 1px;
+    background: $border;
+    margin: 5px 8px;
+}
+
+QDockWidget {
+    color: $text;
+    titlebar-close-icon: none;
+    titlebar-normal-icon: none;
+}
+
+QDockWidget::title {
+    background: $surface_alt;
+    padding: 6px 10px;
+    border-radius: 6px;
+}
+
+QPlainTextEdit, QTextEdit {
+    background: $surface_alt;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 8px;
+    selection-background-color: $selection;
+    selection-color: $text;
+    padding: 6px;
+}
+
+QToolTip {
+    background: $elevated;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+QCheckBox {
+    color: $text;
+    spacing: 8px;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    border: 1px solid $border;
+    background: $surface_alt;
+}
+
+QCheckBox::indicator:checked {
+    background: $accent;
+    border-color: $accent;
+}
+
+QCheckBox::indicator:focus {
+    border: 2px solid $focus;
+}
+
+QMessageBox {
+    background: $bg;
+}
+
+QMessageBox QLabel {
+    color: $text;
+}
