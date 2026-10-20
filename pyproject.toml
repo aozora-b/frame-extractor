@@ -24,8 +24,8 @@ classifiers = [
     "Topic :: Multimedia :: Video",
 ]
 dependencies = [
-    "PySide6>=6.6",
-    "opencv-python-headless>=4.8",
+    "PySide6==6.12.0",
+    "opencv-python-headless==5.0.0.93",
 ]
 
 [project.optional-dependencies]
@@ -34,7 +34,7 @@ dev = [
     "pytest-cov>=5",
     "ruff>=0.6",
     "pillow>=10",
-    "pyinstaller>=6.6",
+    "pyinstaller==6.22.3",
 ]
 
 [project.scripts]
