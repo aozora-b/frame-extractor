@@ -38,10 +38,10 @@ jobs:
             artifact: macos-arm64
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Siapkan Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
@@ -198,7 +198,7 @@ jobs:
           sha256sum -c SHA256SUMS.txt
 
       - name: Unggah artefak
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-${{ matrix.artifact }}
           path: dist-release/frame-extractor-*
@@ -214,10 +214,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Siapkan Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -251,7 +251,7 @@ jobs:
           PY
 
       - name: Unduh artefak
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: release-*
           path: release
@@ -295,7 +295,7 @@ jobs:
           ls -lh
 
       - name: Publikasikan draf rilis
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: Frame Extractor ${{ github.ref_name }}
