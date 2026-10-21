@@ -52,6 +52,32 @@ def test_settings_panel_scrolls_when_height_is_limited(qt_app) -> None:
 
 
 @pytest.mark.gui
+def test_output_clear_button_fits_inside_line_edit(qt_app) -> None:
+    from PySide6.QtWidgets import QToolButton
+
+    from frame_extractor.ui.theme import apply_theme
+    from frame_extractor.ui.widgets.settings_panel import SettingsPanel
+
+    apply_theme(qt_app, "dark")
+    panel = SettingsPanel()
+    panel.resize(360, 700)
+    panel.show()
+    panel.out_edit.setText("E:/ujicoba")
+    qt_app.processEvents()
+    try:
+        buttons = panel.out_edit.findChildren(QToolButton)
+        assert len(buttons) == 1
+        clear_button = buttons[0]
+        assert clear_button.isVisible() is True
+        assert panel.out_edit.rect().contains(clear_button.geometry())
+        assert clear_button.width() <= 24
+        assert clear_button.height() <= 24
+    finally:
+        panel.close()
+        qt_app.processEvents()
+
+
+@pytest.mark.gui
 def test_settings_panel_stays_visible_in_small_window(qt_app, tmp_path: Path) -> None:
     from PySide6.QtCore import QPoint, QSettings
 
