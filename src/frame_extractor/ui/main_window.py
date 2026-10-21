@@ -1060,8 +1060,13 @@ class MainWindow(QMainWindow):
             if answer != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
-            self._closing = True
             self._request_cancel()
+
+        # ``_running`` bisa sudah False ketika worker selesai, tetapi QThread
+        # masih hidup sebentar. Jangan biarkan jendela dihancurkan bersama
+        # thread yang belum berhenti.
+        if self._extract_thread is not None or self._running:
+            self._closing = True
             deadline = time.monotonic() + 6.0
             while self._extract_thread is not None and time.monotonic() < deadline:
                 QApplication.processEvents()
@@ -1071,6 +1076,7 @@ class MainWindow(QMainWindow):
                 self._extract_thread.terminate()
                 self._extract_thread.wait(800)
                 self._extract_thread = None
+                self._extract_worker = None
 
         if self._probe_thread is not None:
             self._probe_thread.quit()

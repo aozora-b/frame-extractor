@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from frame_extractor.core.errors import (
     OutputNotWritableError,
 )
 from frame_extractor.core.extract import extract
-from frame_extractor.core.extract_common import prepare_output_dir
+from frame_extractor.core.extract_common import make_temp_dir, prepare_output_dir
 from frame_extractor.core.extract_ffmpeg import extract_ffmpeg, jpeg_quality_to_qscale
 from frame_extractor.core.extract_opencv import extract_opencv
 from frame_extractor.core.models import ExtractOptions, VideoInfo
@@ -222,6 +223,33 @@ def test_output_dir_cannot_be_created(tmp_path: Path, test_video: Path) -> None:
     blocker.write_text("x")
     with pytest.raises(OutputNotWritableError):
         prepare_output_dir(info, ExtractOptions(mode="interval", out_dir=blocker / "sub"))
+
+
+@pytest.mark.skipif(os.name != "nt", reason="ACL warisan hanya berlaku di Windows")
+def test_temp_dir_keeps_inherited_windows_acl(tmp_path: Path) -> None:
+    """Regresi: mkdtemp mode 0700 membuat file hasil tidak bisa dibuka user lain."""
+
+    import getpass
+    import shutil
+    import subprocess
+
+    if shutil.which("icacls") is None:
+        pytest.skip("icacls tidak tersedia")
+
+    temp_dir = make_temp_dir(tmp_path)
+    try:
+        acl = subprocess.run(
+            ["icacls", str(temp_dir)],
+            check=True,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        ).stdout
+    finally:
+        temp_dir.rmdir()
+
+    assert getpass.getuser().lower() in acl.lower()
 
 
 def test_quality_mapping() -> None:

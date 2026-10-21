@@ -7,6 +7,7 @@ import logging
 import math
 import os
 import re
+import secrets
 import shutil
 import tempfile
 import time
@@ -185,7 +186,33 @@ def finalize_temp_frames(
 
 
 def make_temp_dir(out_dir: Path) -> Path:
-    return Path(tempfile.mkdtemp(prefix=".frame-extractor-", dir=out_dir))
+    """Buat folder kerja sementara dengan izin yang diwarisi dari folder keluaran.
+
+    ``tempfile.mkdtemp`` memakai mode 0700. Di Windows mode itu diterjemahkan
+    menjadi DACL khusus (OWNER RIGHTS + SYSTEM + Administrators), sehingga file
+    yang dipindahkan keluar bisa tidak bisa dibuka oleh pengguna biasa ketika
+    aplikasi berjalan elevated. ``Path.mkdir`` tanpa mode mempertahankan ACL
+    warisan folder induk.
+    """
+
+    for _ in range(100):
+        candidate = out_dir / f".frame-extractor-{secrets.token_hex(6)}"
+        try:
+            candidate.mkdir()
+            return candidate
+        except FileExistsError:
+            continue
+        except OSError as exc:
+            raise OutputNotWritableError(
+                "Folder sementara untuk ekstraksi tidak dapat dibuat.",
+                detail=str(exc),
+                advice="Periksa izin folder keluaran dan ruang disk, lalu coba lagi.",
+            ) from exc
+
+    raise OutputNotWritableError(
+        "Nama folder sementara tidak dapat dibuat.",
+        advice="Coba lagi; jika tetap gagal, pilih folder keluaran lain.",
+    )
 
 
 def cleanup_temp_dir(temp_dir: Path) -> None:

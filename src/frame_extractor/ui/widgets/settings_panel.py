@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSlider,
     QSpinBox,
     QStackedWidget,
@@ -50,27 +52,51 @@ class SettingsPanel(QFrame):
         self._start_ready = False
         self._controls: list[QWidget] = []
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 18, 20, 18)
+        outer = QVBoxLayout(self)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        self.scroll_area = QScrollArea(self)
+        self.scroll_area.setObjectName("SettingsScroll")
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        self.scroll_area.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        self.scroll_area.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+
+        content = QWidget()
+        content.setObjectName("SettingsContent")
+        layout = QVBoxLayout(content)
+        layout.setContentsMargins(20, 18, 20, 12)
         layout.setSpacing(12)
+        self.scroll_area.setWidget(content)
+        outer.addWidget(self.scroll_area, 1)
 
         title = QLabel("Setelan")
         title.setObjectName("SectionTitle")
         layout.addWidget(title)
 
         self.mode_combo = QComboBox()
+        self.mode_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.mode_combo.setMinimumContentsLength(18)
         for value, label in MODE_LABELS:
             self.mode_combo.addItem(label, value)
         self.mode_combo.setAccessibleName("Mode pengambilan frame")
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
-        layout.addWidget(self._labelled("Mode", self.mode_combo))
+        layout.addWidget(self._labelled("Mode", self.mode_combo, top=True))
         self._controls.append(self.mode_combo)
 
         self.mode_stack = QStackedWidget()
         self.mode_stack.setSizePolicy(
-            self.mode_stack.sizePolicy().horizontalPolicy(),
-            self.mode_stack.sizePolicy().verticalPolicy(),
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.Fixed,
         )
+        self.mode_stack.setMinimumHeight(76)
         self.interval_spin = self._double_spin(0.05, 86_400.0, 1.0, 2, " dtk")
         self.interval_spin.setToolTip("Ambil satu frame setiap N detik")
         self.count_spin = self._int_spin(1, 200_000, 30)
@@ -87,11 +113,15 @@ class SettingsPanel(QFrame):
         self._controls.extend([self.interval_spin, self.count_spin, self.start_spin, self.end_spin])
 
         self.format_combo = QComboBox()
+        self.format_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.format_combo.setMinimumContentsLength(16)
         self.format_combo.addItem("PNG — lossless", "png")
         self.format_combo.addItem("JPG — lebih kecil", "jpg")
         self.format_combo.setAccessibleName("Format gambar")
         self.format_combo.currentIndexChanged.connect(self._on_format_changed)
-        layout.addWidget(self._labelled("Format", self.format_combo))
+        layout.addWidget(self._labelled("Format", self.format_combo, top=True))
         self._controls.append(self.format_combo)
 
         self.quality_widget = QWidget()
@@ -104,7 +134,7 @@ class SettingsPanel(QFrame):
         quality_header.addWidget(quality_label)
         quality_header.addStretch(1)
         self.quality_spin = self._int_spin(1, 100, 95)
-        self.quality_spin.setFixedWidth(72)
+        self.quality_spin.setFixedWidth(80)
         self.quality_spin.setAccessibleName("Kualitas JPEG")
         quality_header.addWidget(self.quality_spin)
         quality_layout.addLayout(quality_header)
@@ -164,18 +194,25 @@ class SettingsPanel(QFrame):
 
         layout.addStretch(1)
 
+        footer = QWidget()
+        footer_layout = QVBoxLayout(footer)
+        footer_layout.setContentsMargins(20, 0, 20, 18)
+        footer_layout.setSpacing(8)
+
         self.start_button = QPushButton("Mulai ekstraksi")
         self.start_button.setObjectName("Primary")
         self.start_button.setToolTip("Mulai mengekstrak semua video di antrean (Ctrl+Enter)")
         self.start_button.setEnabled(False)
         self.start_button.clicked.connect(self.startRequested)
-        layout.addWidget(self.start_button)
+        footer_layout.addWidget(self.start_button)
 
         hint = QLabel("Ctrl+Enter untuk mulai · Esc untuk membatalkan")
         hint.setObjectName("StatCaption")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint.setWordWrap(True)
-        layout.addWidget(hint)
+        footer_layout.addWidget(hint)
+
+        outer.addWidget(footer)
 
         self.quality_slider.valueChanged.connect(self._on_quality_slider)
         self.quality_spin.valueChanged.connect(self._on_quality_spin)
@@ -226,6 +263,7 @@ class SettingsPanel(QFrame):
         grid.setContentsMargins(0, 0, 0, 0)
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(6)
+        grid.setColumnStretch(1, 1)
         start_label = QLabel("Mulai")
         start_label.setObjectName("Muted")
         start_label.setBuddy(self.start_spin)
@@ -253,7 +291,9 @@ class SettingsPanel(QFrame):
         spin.setSuffix(suffix)
         spin.setKeyboardTracking(False)
         spin.setAccelerated(True)
-        spin.setMinimumHeight(32)
+        spin.setMinimumHeight(36)
+        spin.setMinimumWidth(132)
+        spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         return spin
 
     def _int_spin(self, minimum: int, maximum: int, value: int) -> QSpinBox:
@@ -262,7 +302,9 @@ class SettingsPanel(QFrame):
         spin.setValue(value)
         spin.setKeyboardTracking(False)
         spin.setAccelerated(True)
-        spin.setMinimumHeight(32)
+        spin.setMinimumHeight(36)
+        spin.setMinimumWidth(100)
+        spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         return spin
 
     # ----------------------------------------------------------------- signals

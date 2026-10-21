@@ -72,6 +72,16 @@ QFrame#Card {
     border-radius: 12px;
 }
 
+QScrollArea#SettingsScroll {
+    background: transparent;
+    border: none;
+}
+
+QScrollArea#SettingsScroll > QWidget > QWidget,
+QWidget#SettingsContent {
+    background: transparent;
+}
+
 QFrame#Footer {
     background: $surface;
     border-top: 1px solid $border;
