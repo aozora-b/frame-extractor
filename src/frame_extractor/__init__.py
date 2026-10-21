@@ -1,4 +1,4 @@
-"""Frame Extractor — ambil gambar diam dari video tanpa terminal."""
+"""Frame Extractor — ambil gambar diam dari video."""
 
 __version__ = "1.0.0"
 APP_NAME = "Frame Extractor"

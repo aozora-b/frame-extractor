@@ -197,7 +197,7 @@ class MainWindow(QMainWindow):
         title = QLabel(APP_NAME)
         title.setObjectName("BrandTitle")
         text_box.addWidget(title)
-        subtitle = QLabel("Ambil gambar diam dari video, tanpa terminal")
+        subtitle = QLabel("Ambil gambar diam dari video")
         subtitle.setObjectName("Muted")
         text_box.addWidget(subtitle)
         layout.addLayout(text_box)
@@ -1079,7 +1079,7 @@ class MainWindow(QMainWindow):
             self,
             f"Tentang {APP_NAME}",
             f"<h3>{APP_NAME} {__version__}</h3>"
-            "<p>Ekstrak frame dari video menjadi PNG atau JPG tanpa terminal.</p>"
+            "<p>Ekstrak frame dari video menjadi PNG atau JPG.</p>"
             "<p>Lisensi aplikasi: MIT. Antarmuka memakai Qt for Python (PySide6, LGPLv3). "
             "Mesin ekstraksi memakai ffmpeg (LGPL) dan OpenCV (Apache 2.0).</p>"
             f"<p>Log: {get_log_path()}</p>",

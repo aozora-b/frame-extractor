@@ -1,6 +1,6 @@
 # Frame Extractor
 
-Aplikasi desktop untuk mengambil frame dari video menjadi PNG atau JPG, dengan antrean batch, pratinjau hasil, dan mesin ffmpeg yang bisa dibatalkan — tanpa terminal.
+Aplikasi desktop untuk mengambil frame dari video menjadi PNG atau JPG, dengan antrean batch, pratinjau hasil, dan mesin ffmpeg yang bisa dibatalkan.
 
 ![Tampilan utama Frame Extractor](assets/screenshot-main.png)
 
