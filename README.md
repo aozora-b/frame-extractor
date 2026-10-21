@@ -24,13 +24,13 @@ Status build lokal Windows: `--onedir` 572,9 MiB (ZIP 241,9 MB) dan `--onefile` 
 
 1. **Jatuhkan video atau folder** ke jendela, atau klik **Pilih video**. Beberapa video akan masuk ke antrean.
 2. **Atur pengambilan**: satu frame tiap N detik, N frame tersebar merata, atau rentang waktu. Pilih PNG/JPG, kualitas, dan folder keluaran. Perkiraan jumlah gambar langsung diperbarui.
-3. **Klik Mulai ekstraksi**. Progres, jumlah frame, dan sisa waktu tampil di bawah; tombol **Batal** (Esc) menghentikan proses tanpa menghapus gambar yang sudah tersimpan. Setelah selesai, galeri menampilkan thumbnail dan tombol **Buka folder**.
+3. **Klik Mulai ekstraksi**. Progres, jumlah frame, dan sisa waktu tampil di bawah; tombol **Batal** (Esc) menghentikan proses tanpa menghapus gambar yang sudah tersimpan. Video yang sudah selesai tetap bertanda **Selesai** dan tidak diekstrak ulang saat Anda menambahkan video baru. Untuk mengeluarkan video dari antrean, pilih barisnya lalu klik **Hapus** atau tekan **Delete**. Setelah selesai, galeri menampilkan thumbnail dan tombol **Buka folder**.
 
 ![Galeri hasil ekstraksi](assets/screenshot-results.png)
 
 ![Demo singkat alur ekstraksi](assets/demo.gif)
 
-Pintasan: `Ctrl+O` buka video, `Ctrl+Shift+O` tambah ke antrean, `Ctrl+Enter` mulai, `Esc` batal, `Ctrl+Q` keluar. Setelan, tema, dan ukuran jendela diingat lewat `QSettings`.
+Pintasan: `Ctrl+O` buka video, `Ctrl+Shift+O` tambah ke antrean, `Delete` hapus video terpilih, `Ctrl+Enter` mulai, `Esc` batal, `Ctrl+Q` keluar. Setelan, tema, dan ukuran jendela diingat lewat `QSettings`.
 
 ## Format yang didukung
 

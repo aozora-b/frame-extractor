@@ -160,6 +160,7 @@ class MainWindow(QMainWindow):
         loaded_layout.addWidget(self.info_card)
         self.queue_panel = QueuePanel()
         self.queue_panel.addRequested.connect(self._choose_files)
+        self.queue_panel.removeRequested.connect(self._remove_path)
         self.queue_panel.currentPathChanged.connect(self._on_queue_current)
         loaded_layout.addWidget(self.queue_panel, 1)
 
@@ -343,6 +344,9 @@ class MainWindow(QMainWindow):
         widgets = [
             self.drop_zone.choose_button,
             self.drop_zone.folder_button,
+            self.queue_panel.add_button,
+            self.queue_panel.remove_button,
+            self.queue_panel.view,
             self.settings_panel.mode_combo,
             self.settings_panel.interval_spin,
             self.settings_panel.count_spin,
@@ -609,6 +613,53 @@ class MainWindow(QMainWindow):
             self._request_probe(path, priority=True)
         self._update_actions()
 
+    def _remove_path(self, path: Path) -> None:
+        if self._running:
+            return
+        model = self.queue_panel.model
+        row = model.row_for_path(path)
+        if row < 0:
+            return
+        current_row = (
+            model.row_for_path(self._current_path)
+            if self._current_path is not None
+            else -1
+        )
+        was_current = current_row == row
+        fallback = model.entry(row + 1) or model.entry(row - 1)
+
+        with contextlib.suppress(ValueError):
+            self._probe_queue.remove(path)
+
+        if model.remove_row(row) is None:
+            return
+
+        if model.rowCount() == 0:
+            self._current_path = None
+            self._current_info = None
+            self.info_card.set_info(None)
+            self.settings_panel.set_info(None)
+            self.settings_panel.set_estimate(None)
+            self.settings_panel.set_note("")
+            self.settings_panel.clear_error()
+            self.settings_panel.set_start_enabled(False)
+            self._show_page(self.empty_page)
+            self._set_footer("Antrean kosong — pilih video untuk memulai")
+            self._update_actions()
+            return
+
+        if was_current:
+            target = fallback if fallback is not None else model.entry(0)
+            if target is not None:
+                self.queue_panel.select_path(target.path)
+                self._on_queue_current(target.path)
+        elif self._current_path is not None:
+            self.queue_panel.select_path(self._current_path)
+
+        self._recalc_estimate()
+        self._update_actions()
+        self._set_footer(f"Video dihapus · {model.rowCount()} video di antrean")
+
     def _show_video(self, info: VideoInfo) -> None:
         self._current_path = info.path
         self._current_info = info
@@ -660,7 +711,7 @@ class MainWindow(QMainWindow):
                 f"± {human_duration(duration)}; proses berjalan di latar belakang."
             )
         self.settings_panel.set_note(note)
-        self.settings_panel.set_start_enabled(model.rowCount() > 0)
+        self.settings_panel.set_start_enabled(model.has_pending())
         self._update_actions()
 
     @staticmethod
@@ -691,6 +742,13 @@ class MainWindow(QMainWindow):
             self._set_footer("Setelan belum valid")
             return
 
+        if not model.prepare_run():
+            self._set_footer(
+                "Semua video di antrean sudah selesai — hapus lalu tambahkan lagi untuk mengulang"
+            )
+            self._recalc_estimate()
+            return
+
         self._batch_options = options
         self._batch_results = []
         self._batch_errors = []
@@ -700,12 +758,10 @@ class MainWindow(QMainWindow):
         self._current_total = 0
         self._current_done = 0
         self._eta_ema = None
-        model.reset_states()
         self._show_page(self.loaded_page)
         self._running = True
         self.settings_panel.set_running(True)
-        self.queue_panel.view.setEnabled(False)
-        self.queue_panel.add_button.setEnabled(False)
+        self.queue_panel.set_running(True)
         self.cancel_button.show()
         self.cancel_button.setEnabled(True)
         self.progress_bar.setRange(0, 100)
@@ -893,8 +949,7 @@ class MainWindow(QMainWindow):
         cancelled = cancelled or self._cancel_requested
         self._running = False
         self.settings_panel.set_running(False)
-        self.queue_panel.view.setEnabled(True)
-        self.queue_panel.add_button.setEnabled(True)
+        self.queue_panel.set_running(False)
         self.cancel_button.hide()
         self.cancel_button.setEnabled(True)
         self._cancel_requested = False
@@ -1011,6 +1066,7 @@ class MainWindow(QMainWindow):
             "<table cellspacing='6'>"
             "<tr><td><b>Ctrl+O</b></td><td>Buka video</td></tr>"
             "<tr><td><b>Ctrl+Shift+O</b></td><td>Tambah video ke antrean</td></tr>"
+            "<tr><td><b>Delete</b></td><td>Hapus video terpilih dari antrean</td></tr>"
             "<tr><td><b>Ctrl+Enter</b></td><td>Mulai ekstraksi</td></tr>"
             "<tr><td><b>Esc</b></td><td>Batalkan ekstraksi</td></tr>"
             "<tr><td><b>Ctrl+Shift+L</b></td><td>Buka/tutup panel log</td></tr>"

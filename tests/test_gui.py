@@ -75,3 +75,129 @@ def test_settings_panel_stays_visible_in_small_window(qt_app, tmp_path: Path) ->
     finally:
         window.close()
         qt_app.processEvents()
+
+
+def _video_info(path: Path):
+    from frame_extractor.core.models import VideoInfo
+
+    return VideoInfo(path, 10.0, 30.0, 320, 240, 300, "h264")
+
+
+def _make_window(qt_app, tmp_path: Path):
+    from PySide6.QtCore import QSettings
+
+    from frame_extractor.ui.main_window import MainWindow
+
+    settings = QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
+    window = MainWindow(settings=settings)
+    return window
+
+
+@pytest.mark.gui
+def test_queue_retries_failed_but_keeps_done_entries(qt_app, tmp_path: Path) -> None:
+    from frame_extractor.ui.models import QueueModel
+
+    model = QueueModel()
+    paths = [tmp_path / name for name in ("a.mp4", "b.mp4", "c.mp4")]
+    model.add_paths(paths)
+    model.update_entry(paths[0], state="done", detail="10 gambar")
+    model.update_entry(paths[1], state="error", detail="gagal")
+    model.update_entry(paths[2], state="cancelled", detail="dibatalkan")
+
+    assert model.prepare_run() is True
+    assert [entry.state for entry in model.entries()] == [
+        "done",
+        "waiting",
+        "waiting",
+    ]
+    assert model.has_pending() is True
+
+    for path in paths:
+        model.update_entry(path, state="done")
+    assert model.has_pending() is False
+    assert model.prepare_run() is False
+
+
+@pytest.mark.gui
+def test_start_batch_skips_completed_entries(qt_app, tmp_path: Path) -> None:
+    window = _make_window(qt_app, tmp_path)
+    model = window.queue_panel.model
+    first = tmp_path / "a.mp4"
+    second = tmp_path / "b.mp4"
+    model.add_paths([first, second])
+    model.update_entry(first, info=_video_info(first), state="done", detail="10 gambar")
+    model.update_entry(second, info=_video_info(second), state="ready")
+    launched: list[Path] = []
+    window._launch_extraction = lambda path, info: launched.append(path)  # type: ignore[method-assign]
+    try:
+        window._start_batch()
+        assert launched == [second]
+        assert model.entry(0).state == "done"
+        assert model.entry(1).state == "ready"
+
+        window._finish_batch()
+        model.update_entry(second, state="done", detail="10 gambar")
+        launched.clear()
+        window._start_batch()
+        assert launched == []
+        assert window._running is False
+        assert "sudah selesai" in window.status_label.text()
+    finally:
+        window._running = False
+        window.close()
+        qt_app.processEvents()
+
+
+@pytest.mark.gui
+def test_queue_panel_remove_button_emits_selected_path(qt_app, tmp_path: Path) -> None:
+    from frame_extractor.ui.widgets.queue_panel import QueuePanel
+
+    panel = QueuePanel()
+    first = tmp_path / "a.mp4"
+    second = tmp_path / "b.mp4"
+    panel.model.add_paths([first, second])
+    panel.select_path(first)
+    emitted: list[Path] = []
+    panel.removeRequested.connect(emitted.append)
+    try:
+        assert panel.remove_button.isEnabled() is True
+        panel.remove_button.click()
+        assert emitted == [first]
+        assert panel.model.rowCount() == 2
+    finally:
+        panel.close()
+        qt_app.processEvents()
+
+
+@pytest.mark.gui
+def test_remove_selected_entry_updates_current_and_empty_state(
+    qt_app, tmp_path: Path
+) -> None:
+    window = _make_window(qt_app, tmp_path)
+    model = window.queue_panel.model
+    first = tmp_path / "a.mp4"
+    second = tmp_path / "b.mp4"
+    model.add_paths([first, second])
+    model.update_entry(first, info=_video_info(first), state="done", detail="10 gambar")
+    model.update_entry(second, info=_video_info(second), state="ready")
+    window.queue_panel.select_path(first)
+    try:
+        assert window._current_path == first
+        assert window.queue_panel.remove_button.isEnabled() is True
+
+        window._remove_path(first)
+        assert model.rowCount() == 1
+        assert model.entry(0).path == second
+        assert window._current_path == second
+        assert window.stack.currentWidget() is window.loaded_page
+        assert window.settings_panel.start_button.isEnabled() is True
+
+        window._remove_path(second)
+        assert model.rowCount() == 0
+        assert window._current_path is None
+        assert window.stack.currentWidget() is window.empty_page
+        assert window.settings_panel.start_button.isEnabled() is False
+        assert window.queue_panel.remove_button.isEnabled() is False
+    finally:
+        window.close()
+        qt_app.processEvents()

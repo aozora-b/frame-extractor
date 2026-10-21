@@ -170,6 +170,12 @@ QPushButton#Danger:hover {
     background: $danger_bg;
 }
 
+QPushButton#Danger:disabled {
+    color: $muted;
+    border-color: $border;
+    background: $surface;
+}
+
 QPushButton#Link {
     background: transparent;
     border: none;

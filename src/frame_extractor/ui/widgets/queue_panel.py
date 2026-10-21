@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PySide6.QtCore import QModelIndex, QRectF, QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPen
+from PySide6.QtGui import QAction, QColor, QFont, QFontMetrics, QKeySequence, QPainter, QPen
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QApplication,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListView,
+    QMenu,
     QPushButton,
     QStyle,
     QStyledItemDelegate,
@@ -157,11 +158,13 @@ class QueueDelegate(QStyledItemDelegate):
 
 class QueuePanel(QFrame):
     addRequested = Signal()
+    removeRequested = Signal(object)
     currentPathChanged = Signal(object)
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("Card")
+        self._running = False
         self.model = QueueModel(self)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 12, 16, 12)
@@ -180,6 +183,12 @@ class QueuePanel(QFrame):
         self.add_button.setToolTip("Tambahkan video lain ke antrean (Ctrl+Shift+O)")
         self.add_button.clicked.connect(self.addRequested)
         header.addWidget(self.add_button)
+        self.remove_button = QPushButton("Hapus")
+        self.remove_button.setObjectName("Danger")
+        self.remove_button.setToolTip("Hapus video terpilih dari antrean (Delete)")
+        self.remove_button.setAccessibleName("Hapus video dari antrean")
+        self.remove_button.clicked.connect(self._request_remove)
+        header.addWidget(self.remove_button)
         layout.addLayout(header)
 
         self.view = QListView()
@@ -193,7 +202,17 @@ class QueuePanel(QFrame):
         self.view.setMinimumHeight(130)
         self.view.setSpacing(0)
         self.view.setAccessibleName("Antrean video")
+        self.view.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.view.customContextMenuRequested.connect(self._show_context_menu)
         layout.addWidget(self.view, 1)
+
+        self.remove_action = QAction("Hapus dari antrean", self)
+        self.remove_action.setShortcut(QKeySequence("Delete"))
+        self.remove_action.setShortcutContext(
+            Qt.ShortcutContext.WidgetWithChildrenShortcut
+        )
+        self.remove_action.triggered.connect(self._request_remove)
+        self.view.addAction(self.remove_action)
 
         self.model.rowsInserted.connect(self._update_count)
         self.model.rowsRemoved.connect(self._update_count)
@@ -204,13 +223,40 @@ class QueuePanel(QFrame):
     def _update_count(self, *args) -> None:  # noqa: ANN002
         count = self.model.rowCount()
         self.count_label.setText(f"{count} video")
-        self.add_button.setEnabled(count > 0)
+        self.add_button.setEnabled(count > 0 and not self._running)
+        self._update_remove_enabled()
+
+    def _update_remove_enabled(self) -> None:
+        enabled = not self._running and self.current_path() is not None
+        self.remove_button.setEnabled(enabled)
+        self.remove_action.setEnabled(enabled)
 
     def _on_current_changed(self, current: QModelIndex, previous: QModelIndex) -> None:  # noqa: ARG002
+        self._update_remove_enabled()
         if current.isValid():
             entry = self.model.entry(current.row())
             if entry is not None:
                 self.currentPathChanged.emit(entry.path)
+
+    def _request_remove(self) -> None:
+        path = self.current_path()
+        if path is not None and not self._running:
+            self.removeRequested.emit(path)
+
+    def _show_context_menu(self, pos) -> None:  # noqa: ANN001
+        index = self.view.indexAt(pos)
+        if not index.isValid() or self._running:
+            return
+        self.view.setCurrentIndex(index)
+        menu = QMenu(self)
+        menu.addAction(self.remove_action)
+        menu.exec(self.view.viewport().mapToGlobal(pos))
+
+    def set_running(self, running: bool) -> None:
+        self._running = running
+        self.view.setEnabled(not running)
+        self.add_button.setEnabled(not running and self.model.rowCount() > 0)
+        self._update_remove_enabled()
 
     def select_path(self, path: Path) -> None:
         row = self.model.row_for_path(path)

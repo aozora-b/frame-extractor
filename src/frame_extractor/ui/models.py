@@ -128,15 +128,39 @@ class QueueModel(QAbstractListModel):
         index = self.index(row, 0)
         self.dataChanged.emit(index, index, [])
 
-    def reset_states(self) -> None:
+    def prepare_run(self) -> bool:
+        """Siapkan antrean untuk batch baru tanpa mengulang item yang selesai.
+
+        Item ``done`` dipertahankan agar tidak diekstrak ulang ketika pengguna
+        menambahkan video lain. Item yang gagal atau dibatalkan dikembalikan ke
+        ``waiting`` supaya tombol Mulai berfungsi sebagai coba-ulang.
+        """
+
+        retryable = {"error", "cancelled"}
+        pending = False
         for entry in self._entries:
-            entry.state = "waiting"
-            entry.detail = ""
-            entry.results = []
+            if entry.state in retryable:
+                entry.state = "waiting"
+                entry.detail = ""
+                entry.results = []
+            if entry.state != "done":
+                pending = True
         if self._entries:
             self.dataChanged.emit(
                 self.index(0, 0), self.index(len(self._entries) - 1, 0), []
             )
+        return pending
+
+    def has_pending(self) -> bool:
+        return any(entry.state != "done" for entry in self._entries)
+
+    def remove_row(self, row: int) -> QueueEntry | None:
+        if not 0 <= row < len(self._entries):
+            return None
+        self.beginRemoveRows(QModelIndex(), row, row)
+        entry = self._entries.pop(row)
+        self.endRemoveRows()
+        return entry
 
     def clear(self) -> None:
         self.beginResetModel()
