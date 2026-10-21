@@ -23,7 +23,7 @@ def main():
         print("ERROR: Token GitHub tidak ditemukan dari git-credential.")
         sys.exit(1)
 
-    repo = "aozora-b/-frame-extractor"
+    repo = "aozora-b/frame-extractor"
     headers = {
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json",
