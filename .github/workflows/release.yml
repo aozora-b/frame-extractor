@@ -263,15 +263,17 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import hashlib
+          import os
           import sys
           from pathlib import Path
 
           release = Path("release")
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
           expected = {
-              "frame-extractor-windows-x64.zip",
-              "frame-extractor-windows-x64-onefile.zip",
-              "frame-extractor-linux-x64.tar.gz",
-              "frame-extractor-macos-arm64.zip",
+              f"frame-extractor-v{version}-windows-x64.zip",
+              f"frame-extractor-v{version}-windows-x64-onefile.zip",
+              f"frame-extractor-v{version}-linux-x64.tar.gz",
+              f"frame-extractor-v{version}-macos-arm64.zip",
           }
           assets = sorted(path for path in release.iterdir() if path.is_file())
           names = {path.name for path in assets}
@@ -309,10 +311,10 @@ jobs:
 
             | Platform | Berkas |
             |---|---|
-            | Windows x64 | `frame-extractor-windows-x64.zip` (utama, `--onedir`) |
-            | Windows x64 | `frame-extractor-windows-x64-onefile.zip` (alternatif satu berkas) |
-            | Linux x64 | `frame-extractor-linux-x64.tar.gz` |
-            | macOS arm64 | `frame-extractor-macos-arm64.zip` |
+            | Windows x64 | `frame-extractor-${{ github.ref_name }}-windows-x64.zip` (utama, `--onedir`) |
+            | Windows x64 | `frame-extractor-${{ github.ref_name }}-windows-x64-onefile.zip` (alternatif satu berkas) |
+            | Linux x64 | `frame-extractor-${{ github.ref_name }}-linux-x64.tar.gz` |
+            | macOS arm64 | `frame-extractor-${{ github.ref_name }}-macos-arm64.zip` |
 
             Semua arsip menyertakan `README.md`, `LICENSE`, `THIRD-PARTY-NOTICES.md`,
             dan folder `licenses/`. Rilis Windows dan Linux menyertakan ffmpeg LGPL;

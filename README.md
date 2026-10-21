@@ -10,11 +10,14 @@ Aset rilis tersedia di halaman **Releases** repositori ini:
 
 | Platform | Berkas | Keterangan |
 |---|---|---|
-| Windows x64 | `frame-extractor-windows-x64.zip` | Utama (`--onedir`), ffmpeg LGPL disertakan |
-| Windows x64 | `frame-extractor-windows-x64-onefile.zip` | Alternatif satu berkas; startup lebih lambat |
-| Linux x64 | `frame-extractor-linux-x64.tar.gz` | `--onedir`, ffmpeg LGPL disertakan |
-| macOS arm64 | `frame-extractor-macos-arm64.zip` | Aplikasi `.app`; memakai mesin OpenCV |
+| Windows x64 | `frame-extractor-v1.0.0-windows-x64.zip` | Utama (`--onedir`), ffmpeg LGPL disertakan |
+| Windows x64 | `frame-extractor-v1.0.0-windows-x64-onefile.zip` | Alternatif satu berkas; startup lebih lambat |
+| Linux x64 | `frame-extractor-v1.0.0-linux-x64.tar.gz` | `--onedir`, ffmpeg LGPL disertakan |
+| macOS arm64 | `frame-extractor-v1.0.0-macos-arm64.zip` | Aplikasi `.app`; memakai mesin OpenCV |
 | Semua | `SHA256SUMS.txt` | Checksum SHA-256 untuk verifikasi unduhan |
+
+Nama arsip mengikuti versi rilis dan platform, sehingga laporan bug dapat
+langsung dikaitkan dengan artefak yang dipakai.
 
 Ekstrak arsip, lalu jalankan `Frame Extractor` (Windows: `Frame Extractor.exe`). Tidak perlu memasang Python atau ffmpeg. Biner belum ditandatangani secara digital; Windows SmartScreen dapat meminta konfirmasi. Verifikasi unduhan dengan `SHA256SUMS.txt`.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import platform
+import re
 import shutil
 import sys
 import tarfile
@@ -14,6 +15,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DOC_FILES = ("LICENSE", "THIRD-PARTY-NOTICES.md", "README.md")
+
+
+def _version() -> str:
+    init = (ROOT / "src" / "frame_extractor" / "__init__.py").read_text(encoding="utf-8")
+    match = re.search(r'__version__\s*=\s*"([^"]+)"', init)
+    if match is None:
+        raise RuntimeError("__version__ tidak ditemukan di src/frame_extractor/__init__.py")
+    return match.group(1)
 
 
 def _arch() -> str:
@@ -74,28 +83,29 @@ def package(onedir: Path | None, onefile: Path | None, output: Path) -> list[Pat
     output.mkdir(parents=True, exist_ok=True)
     system = sys.platform
     arch = _arch()
+    prefix = f"frame-extractor-v{_version()}"
     produced: list[Path] = []
 
     if onedir is not None and onedir.is_dir():
         if system == "darwin" and onedir.suffix == ".app":
             _copy_docs(onedir / "Contents" / "Resources")
-            asset = output / f"frame-extractor-macos-{arch}.zip"
+            asset = output / f"{prefix}-macos-{arch}.zip"
             _zip_folder(onedir, asset)
         else:
             _copy_docs(onedir)
             if system == "win32":
-                asset = output / f"frame-extractor-windows-{arch}.zip"
+                asset = output / f"{prefix}-windows-{arch}.zip"
                 _zip_folder(onedir, asset)
             elif system == "darwin":
-                asset = output / f"frame-extractor-macos-{arch}.zip"
+                asset = output / f"{prefix}-macos-{arch}.zip"
                 _zip_folder(onedir, asset)
             else:
-                asset = output / f"frame-extractor-linux-{arch}.tar.gz"
+                asset = output / f"{prefix}-linux-{arch}.tar.gz"
                 _tar_folder(onedir, asset)
         produced.append(asset)
 
     if onefile is not None and onefile.is_file() and system == "win32":
-        asset = output / f"frame-extractor-windows-{arch}-onefile.zip"
+        asset = output / f"{prefix}-windows-{arch}-onefile.zip"
         _zip_onefile(onefile, asset)
         produced.append(asset)
 

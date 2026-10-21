@@ -61,15 +61,18 @@ python build/package.py
 | Artefak | Ukuran |
 |---|---|
 | `dist/Frame Extractor/` (`--onedir`) | 600.867.704 byte (573,0 MiB) |
-| `dist-release/frame-extractor-windows-x64.zip` | 242.134.279 byte (242,1 MB) |
+| `dist-release/frame-extractor-v1.0.0-windows-x64.zip` | 242.134.338 byte (242,1 MB) |
 | `dist-onefile/Frame Extractor.exe` | 241.140.241 byte (230,0 MiB) |
-| `dist-release/frame-extractor-windows-x64-onefile.zip` | 240.378.674 byte (240,4 MB) |
+| `dist-release/frame-extractor-v1.0.0-windows-x64-onefile.zip` | 240.378.733 byte (240,4 MB) |
+
+Nama aset menyertakan versi dan platform agar laporan bug dapat langsung
+dipetakan ke artefak yang dipakai pengguna.
 
 Checksum SHA-256 build lokal:
 
 ```text
-081feb88049251c34f9f9381b182b54b7659679efd23ee62eb975e61aad798de  frame-extractor-windows-x64.zip
-cd4cdbdc66712368e8b8919613227f7f46fe30e26d74ad68b0cc0079e67e1559  frame-extractor-windows-x64-onefile.zip
+b1757b3e38765fe91849ea90521f751de684188876e985c2b81dcf47d2d833b6  frame-extractor-v1.0.0-windows-x64.zip
+2e850d0c39646e11e8e7244869f48bcc030cba9b6d09f70e99f3dcee44755ee5  frame-extractor-v1.0.0-windows-x64-onefile.zip
 ```
 
 Checksum ini hanya berlaku untuk ZIP lokal tanggal 21 Oktober 2026. Build CI
@@ -119,7 +122,7 @@ Bukti menjalankan biner:
 
 ### Linux x64
 
-- [ ] Workflow membangun `frame-extractor-linux-x64.tar.gz`. **BELUM DIUJI.**
+- [ ] Workflow membangun `frame-extractor-v1.0.0-linux-x64.tar.gz`. **BELUM DIUJI.**
 - [ ] Jalankan di X11/Wayland nyata. **BELUM DIUJI.**
 - [ ] `--self-test` dan `--smoke-test` pada biner hasil CI. **BELUM DIUJI.**
 - [ ] Buka video, ekstrak, batalkan, video rusak, folder tanpa izin, batch 5.
@@ -129,7 +132,7 @@ Bukti menjalankan biner:
 
 ### macOS arm64
 
-- [ ] Workflow membangun `frame-extractor-macos-arm64.zip`. **BELUM DIUJI.**
+- [ ] Workflow membangun `frame-extractor-v1.0.0-macos-arm64.zip`. **BELUM DIUJI.**
 - [ ] Buka `Frame Extractor.app` (Gatekeeper, klik kanan > Open).
       **BELUM DIUJI.**
 - [ ] `--self-test` dan `--smoke-test` pada biner hasil CI. **BELUM DIUJI.**
@@ -149,7 +152,7 @@ sha256sum -c SHA256SUMS.txt
 Windows PowerShell:
 
 ```powershell
-Get-FileHash .\frame-extractor-windows-x64.zip -Algorithm SHA256
+Get-FileHash .\frame-extractor-v1.0.0-windows-x64.zip -Algorithm SHA256
 ```
 
 Bandingkan hasilnya dengan isi `SHA256SUMS.txt` pada halaman rilis.
