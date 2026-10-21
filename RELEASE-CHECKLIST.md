@@ -60,16 +60,16 @@ python build/package.py
 
 | Artefak | Ukuran |
 |---|---|
-| `dist/Frame Extractor/` (`--onedir`) | 600.708.179 byte (572,9 MiB) |
-| `dist-release/frame-extractor-windows-x64.zip` | 241.906.013 byte (241,9 MB) |
-| `dist-onefile/Frame Extractor.exe` | 240.915.074 byte (229,8 MiB) |
-| `dist-release/frame-extractor-windows-x64-onefile.zip` | 240.153.677 byte (240,2 MB) |
+| `dist/Frame Extractor/` (`--onedir`) | 600.867.704 byte (573,0 MiB) |
+| `dist-release/frame-extractor-windows-x64.zip` | 242.134.279 byte (242,1 MB) |
+| `dist-onefile/Frame Extractor.exe` | 241.140.241 byte (230,0 MiB) |
+| `dist-release/frame-extractor-windows-x64-onefile.zip` | 240.378.674 byte (240,4 MB) |
 
 Checksum SHA-256 build lokal:
 
 ```text
-e2e0888cd2f49d48abcb9e00e046c07c53bc354cd8c2ca4a391fa7e5b184fb39  frame-extractor-windows-x64.zip
-6aff17b6d307e59c2431c16408a4cdffb1ff534ed80513d76f883e113a4e8685  frame-extractor-windows-x64-onefile.zip
+081feb88049251c34f9f9381b182b54b7659679efd23ee62eb975e61aad798de  frame-extractor-windows-x64.zip
+cd4cdbdc66712368e8b8919613227f7f46fe30e26d74ad68b0cc0079e67e1559  frame-extractor-windows-x64-onefile.zip
 ```
 
 Checksum ini hanya berlaku untuk ZIP lokal tanggal 21 Oktober 2026. Build CI
