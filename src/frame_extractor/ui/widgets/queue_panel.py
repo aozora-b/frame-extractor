@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
 from ..models import QueueModel
 from ..theme import PALETTES
 
@@ -102,7 +103,7 @@ class QueueDelegate(QStyledItemDelegate):
         painter.drawText(badge, Qt.AlignmentFlag.AlignCenter, str(row + 1))
 
         text_left = rect.left() + 44
-        status = STATE_LABELS.get(state, state)
+        status = tr(STATE_LABELS.get(state, state))
         status_color = QColor(tokens[STATE_COLORS.get(state, "muted")])
         status_font = QFont(option.font)
         status_font.setPixelSize(11)
@@ -172,21 +173,18 @@ class QueuePanel(QFrame):
 
         header = QHBoxLayout()
         header.setSpacing(8)
-        title = QLabel("Antrean")
-        title.setObjectName("SectionTitle")
-        header.addWidget(title)
-        self.count_label = QLabel("0 video")
+        self.title_label = QLabel()
+        self.title_label.setObjectName("SectionTitle")
+        header.addWidget(self.title_label)
+        self.count_label = QLabel()
         self.count_label.setObjectName("Muted")
         header.addWidget(self.count_label)
         header.addStretch(1)
-        self.add_button = QPushButton("Tambah video")
-        self.add_button.setToolTip("Tambahkan video lain ke antrean (Ctrl+Shift+O)")
+        self.add_button = QPushButton()
         self.add_button.clicked.connect(self.addRequested)
         header.addWidget(self.add_button)
-        self.remove_button = QPushButton("Hapus")
+        self.remove_button = QPushButton()
         self.remove_button.setObjectName("Danger")
-        self.remove_button.setToolTip("Hapus video terpilih dari antrean (Delete)")
-        self.remove_button.setAccessibleName("Hapus video dari antrean")
         self.remove_button.clicked.connect(self._request_remove)
         header.addWidget(self.remove_button)
         layout.addLayout(header)
@@ -218,11 +216,28 @@ class QueuePanel(QFrame):
         self.model.rowsRemoved.connect(self._update_count)
         self.model.modelReset.connect(self._update_count)
         self.view.selectionModel().currentChanged.connect(self._on_current_changed)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        self.title_label.setText(tr("Antrean"))
+        self.add_button.setText(tr("Tambah video"))
+        self.add_button.setToolTip(
+            tr("Tambahkan video lain ke antrean (Ctrl+Shift+O)")
+        )
+        self.add_button.setAccessibleName(tr("Tambah video"))
+        self.remove_button.setText(tr("Hapus"))
+        self.remove_button.setToolTip(
+            tr("Hapus video terpilih dari antrean (Delete)")
+        )
+        self.remove_button.setAccessibleName(tr("Hapus video dari antrean"))
+        self.view.setAccessibleName(tr("Antrean video"))
+        self.remove_action.setText(tr("Hapus dari antrean"))
         self._update_count()
+        self.view.viewport().update()
 
     def _update_count(self, *args) -> None:  # noqa: ANN002
         count = self.model.rowCount()
-        self.count_label.setText(f"{count} video")
+        self.count_label.setText(tr("{n} video", n=count))
         self.add_button.setEnabled(count > 0 and not self._running)
         self._update_remove_enabled()
 

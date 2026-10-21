@@ -9,7 +9,7 @@ from collections import deque
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray, QObject, QSettings, Qt, QThread, QTimer, QUrl, Signal
-from PySide6.QtGui import QAction, QCloseEvent, QDesktopServices, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QCloseEvent, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QDockWidget,
@@ -37,6 +37,16 @@ from ..core.models import ExtractOptions, FrameResult, VideoInfo
 from ..core.plan import estimate_output_bytes, plan_points
 from ..logging_setup import get_log_path
 from ..worker import ExtractWorker, ProbeWorker
+from .i18n import (
+    DEFAULT_LANGUAGE,
+    LANGUAGES,
+    format_count,
+    language,
+    normalize_language,
+    set_language,
+    tr,
+    translator,
+)
 from .theme import app_icon, apply_theme
 from .widgets.drop_zone import DropZone
 from .widgets.error_dialog import show_error
@@ -80,6 +90,7 @@ class MainWindow(QMainWindow):
     def __init__(self, settings: QSettings | None = None) -> None:
         super().__init__()
         self.settings = settings or QSettings()
+        set_language(normalize_language(self.settings.value("language", DEFAULT_LANGUAGE)))
         self.setWindowTitle(APP_NAME)
         self.setWindowIcon(app_icon())
         self.setMinimumSize(800, 500)
@@ -102,6 +113,14 @@ class MainWindow(QMainWindow):
         self._item_started = 0.0
         self._eta_ema: float | None = None
         self._last_dir = str(Path.home())
+        self._footer_source = ""
+        self._footer_kwargs: dict[str, object] = {}
+        self._eta_source = ""
+        self._eta_seconds: float | None = None
+        self._count_total = 0
+        self._count_current = 0
+        self._count_total_only = False
+        self._count_show_zero = False
 
         self._extract_thread: QThread | None = None
         self._extract_worker: ExtractWorker | None = None
@@ -124,6 +143,8 @@ class MainWindow(QMainWindow):
         self._set_footer("Siap — pilih video untuk memulai")
         self._update_actions()
         self._set_tab_order()
+        translator.languageChanged.connect(self._on_language_changed)
+        self.retranslate()
 
     # ------------------------------------------------------------------ UI
     def _build_ui(self) -> None:
@@ -197,25 +218,19 @@ class MainWindow(QMainWindow):
         title = QLabel(APP_NAME)
         title.setObjectName("BrandTitle")
         text_box.addWidget(title)
-        subtitle = QLabel("Ambil gambar diam dari video")
-        subtitle.setObjectName("Muted")
-        text_box.addWidget(subtitle)
+        self.subtitle = QLabel()
+        self.subtitle.setObjectName("Muted")
+        text_box.addWidget(self.subtitle)
         layout.addLayout(text_box)
         layout.addStretch(1)
 
         self.theme_button = QToolButton()
-        self.theme_button.setText("Tema")
-        self.theme_button.setToolTip("Ganti tema terang/gelap")
-        self.theme_button.setAccessibleName("Ganti tema")
         self.theme_button.clicked.connect(self._toggle_theme)
         layout.addWidget(self.theme_button)
 
-        info_button = QToolButton()
-        info_button.setText("Info")
-        info_button.setToolTip("Tentang aplikasi dan pintasan keyboard")
-        info_button.setAccessibleName("Tentang aplikasi")
-        info_button.clicked.connect(self._show_about)
-        layout.addWidget(info_button)
+        self.info_button = QToolButton()
+        self.info_button.clicked.connect(self._show_about)
+        layout.addWidget(self.info_button)
         return header
 
     def _build_footer(self) -> QFrame:
@@ -226,7 +241,7 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(20, 10, 20, 10)
         layout.setSpacing(14)
 
-        self.status_label = QLabel("Siap")
+        self.status_label = QLabel()
         self.status_label.setMinimumWidth(220)
         self.status_label.setWordWrap(False)
         layout.addWidget(self.status_label)
@@ -235,7 +250,6 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
         self.progress_bar.setTextVisible(False)
-        self.progress_bar.setAccessibleName("Progres ekstraksi")
         layout.addWidget(self.progress_bar, 1)
 
         self.count_label = QLabel("")
@@ -249,10 +263,8 @@ class MainWindow(QMainWindow):
         self.eta_label.setMinimumWidth(150)
         layout.addWidget(self.eta_label)
 
-        self.cancel_button = QPushButton("Batal")
+        self.cancel_button = QPushButton()
         self.cancel_button.setObjectName("Danger")
-        self.cancel_button.setToolTip("Hentikan proses (Esc); hasil yang sudah tersimpan tetap ada")
-        self.cancel_button.setAccessibleName("Batalkan ekstraksi")
         self.cancel_button.clicked.connect(self._request_cancel)
         self.cancel_button.hide()
         layout.addWidget(self.cancel_button)
@@ -261,26 +273,26 @@ class MainWindow(QMainWindow):
     def _build_menu(self) -> None:
         bar = self.menuBar()
 
-        file_menu = bar.addMenu("Berkas")
-        self.open_action = QAction("Buka video…", self)
+        self.file_menu = bar.addMenu("")
+        self.open_action = QAction("", self)
         self.open_action.setShortcut(QKeySequence("Ctrl+O"))
         self.open_action.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogOpenButton))
         self.open_action.triggered.connect(self._choose_files)
-        file_menu.addAction(self.open_action)
+        self.file_menu.addAction(self.open_action)
 
-        self.add_action = QAction("Tambah ke antrean…", self)
+        self.add_action = QAction("", self)
         self.add_action.setShortcut(QKeySequence("Ctrl+Shift+O"))
         self.add_action.triggered.connect(self._choose_files)
-        file_menu.addAction(self.add_action)
+        self.file_menu.addAction(self.add_action)
 
-        file_menu.addSeparator()
-        self.quit_action = QAction("Keluar", self)
+        self.file_menu.addSeparator()
+        self.quit_action = QAction("", self)
         self.quit_action.setShortcut(QKeySequence("Ctrl+Q"))
         self.quit_action.triggered.connect(self.close)
-        file_menu.addAction(self.quit_action)
+        self.file_menu.addAction(self.quit_action)
 
-        extract_menu = bar.addMenu("Ekstraksi")
-        self.start_action = QAction("Mulai ekstraksi", self)
+        self.extract_menu = bar.addMenu("")
+        self.start_action = QAction("", self)
         self.start_action.setShortcuts(
             [QKeySequence("Ctrl+Return"), QKeySequence("Ctrl+Enter")]
         )
@@ -288,45 +300,125 @@ class MainWindow(QMainWindow):
             self.style().standardIcon(QStyle.StandardPixmap.SP_MediaPlay)
         )
         self.start_action.triggered.connect(self._start_batch)
-        extract_menu.addAction(self.start_action)
+        self.extract_menu.addAction(self.start_action)
 
-        self.cancel_action = QAction("Batalkan", self)
+        self.cancel_action = QAction("", self)
         self.cancel_action.setShortcut(QKeySequence("Esc"))
         self.cancel_action.setShortcutContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.cancel_action.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserStop)
         )
         self.cancel_action.triggered.connect(self._request_cancel)
-        extract_menu.addAction(self.cancel_action)
+        self.extract_menu.addAction(self.cancel_action)
 
-        extract_menu.addSeparator()
-        self.open_folder_action = QAction("Buka folder hasil", self)
+        self.extract_menu.addSeparator()
+        self.open_folder_action = QAction("", self)
         self.open_folder_action.setIcon(
             self.style().standardIcon(QStyle.StandardPixmap.SP_DirOpenIcon)
         )
         self.open_folder_action.triggered.connect(self._open_results_folder)
-        extract_menu.addAction(self.open_folder_action)
+        self.extract_menu.addAction(self.open_folder_action)
 
-        view_menu = bar.addMenu("Tampilan")
-        self.dark_action = QAction("Tema gelap", self)
+        self.view_menu = bar.addMenu("")
+        self.dark_action = QAction("", self)
         self.dark_action.setCheckable(True)
         self.dark_action.setShortcut(QKeySequence("Ctrl+Shift+T"))
         self.dark_action.triggered.connect(self._set_dark_from_action)
-        view_menu.addAction(self.dark_action)
+        self.view_menu.addAction(self.dark_action)
 
-        self.log_action = QAction("Panel log", self)
+        self.log_action = QAction("", self)
         self.log_action.setCheckable(True)
         self.log_action.setShortcut(QKeySequence("Ctrl+Shift+L"))
         self.log_action.toggled.connect(self._toggle_log)
-        view_menu.addAction(self.log_action)
+        self.view_menu.addAction(self.log_action)
 
-        help_menu = bar.addMenu("Bantuan")
-        shortcuts = QAction("Pintasan keyboard", self)
-        shortcuts.triggered.connect(self._show_shortcuts)
-        help_menu.addAction(shortcuts)
-        about = QAction("Tentang Frame Extractor", self)
-        about.triggered.connect(self._show_about)
-        help_menu.addAction(about)
+        self.language_menu = self.view_menu.addMenu("")
+        self.language_group = QActionGroup(self)
+        self.language_group.setExclusive(True)
+        self.language_actions: dict[str, QAction] = {}
+        for code, name in LANGUAGES:
+            action = QAction(tr(name), self)
+            action.setCheckable(True)
+            action.setData(code)
+            action.triggered.connect(
+                lambda _checked=False, selected=code: self._set_language(selected)
+            )
+            self.language_group.addAction(action)
+            self.language_menu.addAction(action)
+            self.language_actions[code] = action
+
+        self.help_menu = bar.addMenu("")
+        self.shortcuts_action = QAction("", self)
+        self.shortcuts_action.triggered.connect(self._show_shortcuts)
+        self.help_menu.addAction(self.shortcuts_action)
+        self.about_action = QAction("", self)
+        self.about_action.triggered.connect(self._show_about)
+        self.help_menu.addAction(self.about_action)
+        self._sync_language_actions()
+
+    def _set_language(self, code: str) -> None:
+        selected = normalize_language(code)
+        if selected == language():
+            self._sync_language_actions()
+            return
+        set_language(selected)
+
+    def _on_language_changed(self, selected: str) -> None:
+        self.settings.setValue("language", normalize_language(selected))
+        self.retranslate()
+
+    def _sync_language_actions(self) -> None:
+        for code, action in getattr(self, "language_actions", {}).items():
+            action.setChecked(code == language())
+
+    def retranslate(self) -> None:
+        self.subtitle.setText(tr("Ambil gambar diam dari video"))
+        self.theme_button.setText(tr("Tema"))
+        self.theme_button.setToolTip(tr("Ganti tema terang/gelap"))
+        self.theme_button.setAccessibleName(tr("Ganti tema"))
+        self.info_button.setText(tr("Info"))
+        self.info_button.setToolTip(tr("Tentang aplikasi dan pintasan keyboard"))
+        self.info_button.setAccessibleName(tr("Tentang aplikasi"))
+        self.progress_bar.setAccessibleName(tr("Progres ekstraksi"))
+        self.cancel_button.setText(tr("Batal"))
+        self.cancel_button.setToolTip(
+            tr("Hentikan proses (Esc); hasil yang sudah tersimpan tetap ada")
+        )
+        self.cancel_button.setAccessibleName(tr("Batalkan ekstraksi"))
+
+        self.file_menu.setTitle(tr("Berkas"))
+        self.open_action.setText(tr("Buka video…"))
+        self.add_action.setText(tr("Tambah ke antrean…"))
+        self.quit_action.setText(tr("Keluar"))
+        self.extract_menu.setTitle(tr("Ekstraksi"))
+        self.start_action.setText(tr("Mulai ekstraksi"))
+        self.cancel_action.setText(tr("Batalkan"))
+        self.open_folder_action.setText(tr("Buka folder hasil"))
+        self.view_menu.setTitle(tr("Tampilan"))
+        self.dark_action.setText(tr("Tema gelap"))
+        self.log_action.setText(tr("Panel log"))
+        self.language_menu.setTitle(tr("Bahasa"))
+        self.language_actions["id"].setText(tr("Bahasa Indonesia"))
+        self.language_actions["en"].setText(tr("English"))
+        self.help_menu.setTitle(tr("Bantuan"))
+        self.shortcuts_action.setText(tr("Pintasan keyboard"))
+        self.about_action.setText(tr("Tentang Frame Extractor"))
+        self.log_dock.setWindowTitle(tr("Log"))
+        self.log_edit.setAccessibleName(tr("Log aplikasi"))
+
+        self.drop_zone.retranslate()
+        self.info_card.retranslate()
+        self.queue_panel.retranslate()
+        self.settings_panel.retranslate()
+        self.gallery.retranslate()
+        self._sync_language_actions()
+        self._sync_theme_ui()
+        self._render_footer()
+        self._render_eta()
+        self._render_count()
+        if not self._running:
+            self._recalc_estimate()
+        self._update_actions()
 
     def _build_log_dock(self) -> None:
         self.log_dock = QDockWidget("Log", self)
@@ -393,8 +485,14 @@ class MainWindow(QMainWindow):
 
     def _sync_theme_ui(self) -> None:
         self.dark_action.setChecked(self._theme == "dark")
-        target = "terang" if self._theme == "dark" else "gelap"
-        self.theme_button.setToolTip(f"Tema saat ini: {self._theme}. Klik untuk beralih ke {target}.")
+        target = tr("terang") if self._theme == "dark" else tr("gelap")
+        self.theme_button.setToolTip(
+            tr(
+                "Tema saat ini: {theme}. Klik untuk beralih ke {target}.",
+                theme=tr("gelap") if self._theme == "dark" else tr("terang"),
+                target=target,
+            )
+        )
 
     # ------------------------------------------------------------- file input
     def _dialog_start(self) -> str:
@@ -406,7 +504,7 @@ class MainWindow(QMainWindow):
         if self._running:
             return
         files, _ = QFileDialog.getOpenFileNames(
-            self, "Pilih video", self._dialog_start(), FILE_DIALOG_FILTER
+            self, tr("Pilih video"), self._dialog_start(), tr(FILE_DIALOG_FILTER)
         )
         if files:
             self._last_dir = str(Path(files[0]).parent)
@@ -415,7 +513,7 @@ class MainWindow(QMainWindow):
     def _choose_folder(self) -> None:
         if self._running:
             return
-        folder = QFileDialog.getExistingDirectory(self, "Pilih folder video", self._dialog_start())
+        folder = QFileDialog.getExistingDirectory(self, tr("Pilih folder video"), self._dialog_start())
         if folder:
             self._last_dir = folder
             self._add_paths([Path(folder)])
@@ -429,8 +527,8 @@ class MainWindow(QMainWindow):
         if self._running:
             QMessageBox.information(
                 self,
-                "Sedang memproses",
-                "Tunggu hingga proses selesai atau batalkan sebelum menambah video.",
+                tr("Sedang memproses"),
+                tr("Tunggu hingga proses selesai atau batalkan sebelum menambah video."),
             )
             return
         self._add_paths([Path(item) for item in paths])
@@ -460,14 +558,14 @@ class MainWindow(QMainWindow):
             if folders_empty and not rejected:
                 QMessageBox.information(
                     self,
-                    "Folder kosong",
-                    "Tidak ada berkas video yang didukung di folder tersebut.",
+                    tr("Folder kosong"),
+                    tr("Tidak ada berkas video yang didukung di folder tersebut."),
                 )
             else:
                 QMessageBox.warning(
                     self,
-                    "Bukan video",
-                    "Pilih berkas video seperti MP4, MKV, MOV, WebM, atau AVI.",
+                    tr("Bukan video"),
+                    tr("Pilih berkas video seperti MP4, MKV, MOV, WebM, atau AVI."),
                 )
             return
 
@@ -479,10 +577,17 @@ class MainWindow(QMainWindow):
         if rejected or folders_empty:
             details = []
             if rejected:
-                details.append(f"{rejected} berkas dilewati karena bukan video yang didukung.")
+                details.append(
+                    tr(
+                        "{n} berkas dilewati karena bukan video yang didukung.",
+                        n=rejected,
+                    )
+                )
             if folders_empty:
-                details.append(f"{folders_empty} folder tidak berisi video.")
-            QMessageBox.information(self, "Sebagian berkas dilewati", "\n".join(details))
+                details.append(tr("{n} folder tidak berisi video.", n=folders_empty))
+            QMessageBox.information(
+                self, tr("Sebagian berkas dilewati"), "\n".join(details)
+            )
 
         self._show_page(self.loaded_page)
         new_paths = [self.queue_panel.model.entry(row).path for row in new_rows]  # type: ignore[union-attr]
@@ -490,7 +595,10 @@ class MainWindow(QMainWindow):
         self._on_queue_current(new_paths[0])
         for path in new_paths:
             self._request_probe(path)
-        self._set_footer(f"{self.queue_panel.model.rowCount()} video di antrean")
+        self._set_footer(
+            "{n} video di antrean",
+            n=self.queue_panel.model.rowCount(),
+        )
         self._update_actions()
 
     # ------------------------------------------------------------------ probe
@@ -525,7 +633,7 @@ class MainWindow(QMainWindow):
             self._probe_active_path = path
             self._probe_active_ok = False
             if not self._running:
-                self._set_footer(f"Membaca metadata {path.name}…")
+                self._set_footer("Membaca metadata {name}…", name=path.name)
 
             thread = QThread(self)
             worker = ProbeWorker(path)
@@ -549,7 +657,8 @@ class MainWindow(QMainWindow):
             info.path,
             info=info,
             state="ready",
-            detail=f"{human_duration(info.duration_s)} · {info.width}×{info.height}",
+            detail="",
+            detail_kind="media",
         )
         if self._current_path == info.path and not self._running:
             self._show_video(info)
@@ -609,7 +718,7 @@ class MainWindow(QMainWindow):
             self.settings_panel.set_estimate(None)
             self.settings_panel.set_note("")
             self.settings_panel.clear_error()
-            self._set_footer(f"Membaca metadata {path.name}…")
+            self._set_footer("Membaca metadata {name}…", name=path.name)
             self._request_probe(path, priority=True)
         self._update_actions()
 
@@ -658,7 +767,10 @@ class MainWindow(QMainWindow):
 
         self._recalc_estimate()
         self._update_actions()
-        self._set_footer(f"Video dihapus · {model.rowCount()} video di antrean")
+        self._set_footer(
+            "Video dihapus · tersisa {n} video",
+            n=model.rowCount(),
+        )
 
     def _show_video(self, info: VideoInfo) -> None:
         self._current_path = info.path
@@ -667,7 +779,7 @@ class MainWindow(QMainWindow):
         self.info_card.set_info(info)
         self.settings_panel.set_info(info)
         if not self._running:
-            self._set_footer(f"{info.path.name} · siap diekstrak")
+            self._set_footer("{name} · siap diekstrak", name=info.path.name)
         self._recalc_estimate()
 
     def _show_page(self, page: QWidget) -> None:
@@ -708,9 +820,11 @@ class MainWindow(QMainWindow):
         if info.duration_s > 2 * 3600:
             note = (
                 "Video ini lebih dari 2 jam. Perkiraan waktu ekstraksi "
-                f"± {human_duration(duration)}; proses berjalan di latar belakang."
+                "± {duration}; proses berjalan di latar belakang."
             )
-        self.settings_panel.set_note(note)
+            self.settings_panel.set_note(note, duration_s=duration)
+        else:
+            self.settings_panel.set_note("")
         self.settings_panel.set_start_enabled(model.has_pending())
         self._update_actions()
 
@@ -733,6 +847,7 @@ class MainWindow(QMainWindow):
         if model.rowCount() == 0:
             self._set_footer("Tambahkan video terlebih dahulu")
             return
+
         try:
             options = self.settings_panel.options()
             if self._current_info is not None:
@@ -766,8 +881,8 @@ class MainWindow(QMainWindow):
         self.cancel_button.setEnabled(True)
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.count_label.setText("")
-        self.eta_label.setText("menghitung sisa waktu…")
+        self._set_count_progress(0, 0, show_zero=True)
+        self._set_eta("menghitung sisa waktu…")
         self._set_footer("Menyiapkan ekstraksi…")
         self._update_actions()
         self._run_next_item()
@@ -800,7 +915,7 @@ class MainWindow(QMainWindow):
         if entry.info is None:
             model.update_entry(entry.path, state="probing", detail="")
             self._batch_pending_path = entry.path
-            self._set_footer(f"Membaca metadata {entry.path.name}…")
+            self._set_footer("Membaca metadata {name}…", name=entry.path.name)
             self._request_probe(entry.path, priority=True)
             return
 
@@ -818,9 +933,9 @@ class MainWindow(QMainWindow):
         self._item_started = time.monotonic()
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
-        self.count_label.setText("0")
-        self.eta_label.setText("menghitung sisa waktu…")
-        self._set_footer(f"Mengekstrak {path.name}…")
+        self._set_count_progress(0, 0, show_zero=True)
+        self._set_eta("menghitung sisa waktu…")
+        self._set_footer("Mengekstrak {name}…", name=path.name)
 
         thread = QThread(self)
         worker = ExtractWorker(info, options, engine="auto")
@@ -854,21 +969,21 @@ class MainWindow(QMainWindow):
         if self.progress_bar.maximum() != total:
             self.progress_bar.setRange(0, total)
         self.progress_bar.setValue(self._current_done)
-        self.count_label.setText(f"{self._current_done}/{total}")
+        self._set_count_progress(self._current_done, total)
         elapsed = max(0.001, time.monotonic() - self._item_started)
         if done > 0:
             raw = elapsed / done * (total - done)
             self._eta_ema = raw if self._eta_ema is None else (0.7 * self._eta_ema + 0.3 * raw)
-            self.eta_label.setText(eta_text(self._eta_ema))
+            self._set_eta(seconds=self._eta_ema)
         else:
-            self.eta_label.setText("menghitung sisa waktu…")
+            self._set_eta("menghitung sisa waktu…")
 
     def _on_stage(self, stage: str) -> None:
         name = self._current_path.name if self._current_path else "video"
         if stage == "memeriksa":
-            self._set_footer(f"Memeriksa {name}…")
+            self._set_footer("Memeriksa {name}…", name=name)
         elif stage == "mengekstrak":
-            self._set_footer(f"Mengekstrak {name}…")
+            self._set_footer("Mengekstrak {name}…", name=name)
         elif stage == "menyimpan":
             self._set_footer("Menyimpan hasil…")
 
@@ -880,11 +995,11 @@ class MainWindow(QMainWindow):
             self._run_next_item()
             return
         entries = [item for item in results if isinstance(item, FrameResult)]
-        total_size = sum(item.size_bytes for item in entries)
         self.queue_panel.model.update_entry(
             path,
             state="done",
-            detail=f"{len(entries)} gambar · {human_bytes(total_size)}",
+            detail="",
+            detail_kind="done",
             results=entries,
         )
         self._batch_results.extend(entries)
@@ -909,8 +1024,9 @@ class MainWindow(QMainWindow):
             self._error_shown = True
             message, advice, technical = _split_detail(detail)
             if worker_results:
-                message += (
-                    f"\n\n{len(worker_results)} gambar yang sudah selesai tetap tersimpan."
+                message += "\n\n" + tr(
+                    "{n} gambar yang sudah selesai tetap tersimpan.",
+                    n=len(worker_results),
                 )
             show_error(self, title, message, advice, technical)
         self._run_next_item()
@@ -924,7 +1040,9 @@ class MainWindow(QMainWindow):
             self.queue_panel.model.update_entry(
                 path,
                 state="cancelled",
-                detail=f"{count} dari {self._current_total} gambar tersimpan",
+                detail="",
+                detail_kind="cancelled",
+                detail_args={"saved": count, "total": self._current_total},
                 results=list(results),
             )
             self._batch_results.extend(results)
@@ -936,7 +1054,7 @@ class MainWindow(QMainWindow):
             return
         self._cancel_requested = True
         self.cancel_button.setEnabled(False)
-        self.eta_label.setText("menghentikan…")
+        self._set_eta("menghentikan…")
         self._set_footer("Membatalkan ekstraksi…")
         if self._extract_worker is not None:
             self._extract_worker.request_cancel()
@@ -960,7 +1078,10 @@ class MainWindow(QMainWindow):
             for entry in model.entries():
                 if entry.state in ("waiting", "ready", "probing"):
                     model.update_entry(
-                        entry.path, state="cancelled", detail="Tidak dijalankan"
+                        entry.path,
+                        state="cancelled",
+                        detail="",
+                        detail_kind="not_run",
                     )
 
         elapsed = max(0.0, time.monotonic() - self._batch_started)
@@ -987,38 +1108,44 @@ class MainWindow(QMainWindow):
         if cancelled:
             if results:
                 self._set_footer(
-                    f"Dibatalkan · {len(results)} gambar tersimpan"
+                    "Dibatalkan · {n} gambar tersimpan",
+                    n=len(results),
                 )
             else:
                 self._set_footer("Dibatalkan · tidak ada gambar tersimpan")
-            self.count_label.setText(f"{self._current_done}/{self._current_total}" if self._current_total else "")
-            self.eta_label.setText("dibatalkan")
+            self._set_count_progress(self._current_done, self._current_total)
+            self._set_eta("dibatalkan")
         elif self._batch_errors:
             if results:
                 self._set_footer(
-                    f"Selesai dengan {len(self._batch_errors)} galat · {len(results)} gambar"
+                    "Selesai dengan galat: {errors} · {n} gambar",
+                    errors=len(self._batch_errors),
+                    n=len(results),
                 )
             else:
                 self._set_footer("Ekstraksi gagal · lihat pesan galat")
-            self.eta_label.setText("selesai dengan galat")
+            self._set_eta("selesai dengan galat")
             if not self._error_shown:
                 name, title, detail = self._batch_errors[0]
                 message, advice, technical = _split_detail(detail)
                 self._error_shown = True
                 show_error(
                     self,
-                    f"{title} — {name}",
+                    f"{tr(title)} — {name}",
                     message,
                     advice,
                     technical,
                 )
         else:
-            total_text = f"{len(results):,} gambar".replace(",", ".")
-            self._set_footer(f"Selesai · {total_text} · {human_bytes(total_size)}")
+            self._set_footer(
+                "Selesai · {n} gambar · {size}",
+                n=len(results),
+                size_bytes=total_size,
+            )
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(100)
-            self.count_label.setText(total_text)
-            self.eta_label.setText("selesai")
+            self._set_count_total(len(results))
+            self._set_eta("selesai")
 
         self._recalc_estimate()
         self._update_actions()
@@ -1034,16 +1161,73 @@ class MainWindow(QMainWindow):
         if not folder.exists():
             QMessageBox.warning(
                 self,
-                "Folder tidak ditemukan",
-                f"Folder hasil tidak lagi tersedia:\n{folder}",
+                tr("Folder tidak ditemukan"),
+                tr("Folder hasil tidak lagi tersedia:\n{folder}", folder=folder),
             )
             return
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     # ------------------------------------------------------------------ footer
-    def _set_footer(self, text: str) -> None:
+    def _set_footer(self, source: str, **kwargs: object) -> None:
+        self._footer_source = source
+        self._footer_kwargs = dict(kwargs)
+        self._render_footer()
+
+    def _render_footer(self) -> None:
+        values = dict(self._footer_kwargs)
+        if "size_bytes" in values:
+            values["size"] = human_bytes(float(values.pop("size_bytes")), language())
+        if "duration_s" in values:
+            values["duration"] = human_duration(
+                float(values.pop("duration_s")), language()
+            )
+        text = tr(self._footer_source, **values) if self._footer_source else ""
         self.status_label.setText(text)
         self.status_label.setToolTip(text)
+
+    def _set_eta(self, source: str | None = None, *, seconds: float | None = None) -> None:
+        self._eta_source = source or ""
+        self._eta_seconds = seconds
+        self._render_eta()
+
+    def _render_eta(self) -> None:
+        if self._eta_seconds is not None:
+            text = eta_text(self._eta_seconds, language())
+        elif self._eta_source:
+            text = tr(self._eta_source)
+        else:
+            text = ""
+        self.eta_label.setText(text)
+
+    def _set_count_progress(
+        self, current: int, total: int, *, show_zero: bool = False
+    ) -> None:
+        self._count_current = int(current)
+        self._count_total = int(total)
+        self._count_total_only = False
+        self._count_show_zero = show_zero
+        self._render_count()
+
+    def _set_count_total(self, total: int) -> None:
+        self._count_total = int(total)
+        self._count_current = int(total)
+        self._count_total_only = True
+        self._count_show_zero = False
+        self._render_count()
+
+    def _render_count(self) -> None:
+        if self._count_total_only:
+            text = format_count(self._count_total)
+        elif self._count_total:
+            text = (
+                f"{format_count(self._count_current)}/"
+                f"{format_count(self._count_total)}"
+            )
+        elif self._count_show_zero:
+            text = "0"
+        else:
+            text = ""
+        self.count_label.setText(text)
 
     def _update_actions(self) -> None:
         self.open_action.setEnabled(not self._running)
@@ -1059,30 +1243,34 @@ class MainWindow(QMainWindow):
 
     # -------------------------------------------------------------------- info
     def _show_shortcuts(self) -> None:
+        rows = [
+            ("Ctrl+O", "Buka video"),
+            ("Ctrl+Shift+O", "Tambah video ke antrean"),
+            ("Delete", "Hapus video terpilih dari antrean"),
+            ("Ctrl+Enter", "Mulai ekstraksi"),
+            ("Esc", "Batalkan ekstraksi"),
+            ("Ctrl+Shift+L", "Buka/tutup panel log"),
+            ("Ctrl+Q", "Keluar"),
+        ]
+        body = "".join(
+            f"<tr><td><b>{shortcut}</b></td><td>{tr(label)}</td></tr>"
+            for shortcut, label in rows
+        )
         QMessageBox.information(
             self,
-            "Pintasan keyboard",
-            "<b>Pintasan keyboard</b><br><br>"
-            "<table cellspacing='6'>"
-            "<tr><td><b>Ctrl+O</b></td><td>Buka video</td></tr>"
-            "<tr><td><b>Ctrl+Shift+O</b></td><td>Tambah video ke antrean</td></tr>"
-            "<tr><td><b>Delete</b></td><td>Hapus video terpilih dari antrean</td></tr>"
-            "<tr><td><b>Ctrl+Enter</b></td><td>Mulai ekstraksi</td></tr>"
-            "<tr><td><b>Esc</b></td><td>Batalkan ekstraksi</td></tr>"
-            "<tr><td><b>Ctrl+Shift+L</b></td><td>Buka/tutup panel log</td></tr>"
-            "<tr><td><b>Ctrl+Q</b></td><td>Keluar</td></tr>"
-            "</table>",
+            tr("Pintasan keyboard"),
+            f"<b>{tr('Pintasan keyboard')}</b><br><br>"
+            f"<table cellspacing='6'>{body}</table>",
         )
 
     def _show_about(self) -> None:
         QMessageBox.about(
             self,
-            f"Tentang {APP_NAME}",
+            tr("Tentang {name}", name=APP_NAME),
             f"<h3>{APP_NAME} {__version__}</h3>"
-            "<p>Ekstrak frame dari video menjadi PNG atau JPG.</p>"
-            "<p>Lisensi aplikasi: MIT. Antarmuka memakai Qt for Python (PySide6, LGPLv3). "
-            "Mesin ekstraksi memakai ffmpeg (LGPL) dan OpenCV (Apache 2.0).</p>"
-            f"<p>Log: {get_log_path()}</p>",
+            f"<p>{tr('Ekstrak frame dari video menjadi PNG atau JPG.')}</p>"
+            f"<p>{tr('Lisensi aplikasi: MIT. Antarmuka memakai Qt for Python (PySide6, LGPLv3). Mesin ekstraksi memakai ffmpeg (LGPL) dan OpenCV (Apache 2.0).')}</p>"
+            f"<p>{tr('Log: {path}', path=get_log_path())}</p>",
         )
 
     # ---------------------------------------------------------------- settings
@@ -1098,6 +1286,7 @@ class MainWindow(QMainWindow):
     def _save_settings(self) -> None:
         self.settings_panel.save_settings(self.settings)
         self.settings.setValue("theme", self._theme)
+        self.settings.setValue("language", language())
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("last_dir", self._last_dir)
         self.settings.sync()
@@ -1107,9 +1296,11 @@ class MainWindow(QMainWindow):
         if self._running:
             answer = QMessageBox.question(
                 self,
-                "Ekstraksi sedang berjalan",
-                "Hentikan ekstraksi dan keluar?\n\n"
-                "Gambar yang sudah tersimpan tidak akan dihapus.",
+                tr("Ekstraksi sedang berjalan"),
+                tr(
+                    "Hentikan ekstraksi dan keluar?\n\n"
+                    "Gambar yang sudah tersimpan tidak akan dihapus."
+                ),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )

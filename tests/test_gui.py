@@ -227,3 +227,237 @@ def test_remove_selected_entry_updates_current_and_empty_state(
     finally:
         window.close()
         qt_app.processEvents()
+
+
+@pytest.mark.gui
+def test_language_switch_updates_interface_and_persists(qt_app, tmp_path: Path) -> None:
+    from PySide6.QtCore import QSettings
+
+    from frame_extractor.core.formats import FILE_DIALOG_FILTER
+    from frame_extractor.ui.i18n import language, set_language, tr
+    from frame_extractor.ui.main_window import MainWindow
+
+    settings = QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
+    set_language("id")
+    first = MainWindow(settings=settings)
+    try:
+        assert language() == "id"
+        assert first.file_menu.title() == "Berkas"
+        assert first.view_menu.title() == "Tampilan"
+        assert first.language_menu.title() == "Bahasa"
+        assert first.language_actions["id"].isChecked() is True
+        assert first.language_actions["en"].isChecked() is False
+        assert first.drop_zone.title_label.text() == "Jatuhkan video atau folder di sini"
+        assert first.drop_zone.choose_button.text() == "Pilih video"
+        assert first.settings_panel.start_button.text() == "Mulai ekstraksi"
+        assert first.settings_panel.mode_combo.itemText(0) == "Satu frame tiap N detik"
+        assert first.queue_panel.title_label.text() == "Antrean"
+        assert first.queue_panel.count_label.text() == "0 video"
+        assert first.gallery.title_label.text() == "Hasil"
+        assert first.gallery.summary_label.text() == "Belum ada hasil"
+        assert first.status_label.text().startswith("Siap")
+        assert tr(FILE_DIALOG_FILTER).startswith("Berkas video")
+
+        first.language_actions["en"].trigger()
+        qt_app.processEvents()
+
+        assert language() == "en"
+        assert settings.value("language") == "en"
+        assert first.file_menu.title() == "File"
+        assert first.view_menu.title() == "View"
+        assert first.language_menu.title() == "Language"
+        assert first.language_actions["en"].isChecked() is True
+        assert first.language_actions["id"].isChecked() is False
+        assert first.drop_zone.title_label.text() == "Drop a video or folder here"
+        assert first.drop_zone.choose_button.text() == "Choose video"
+        assert first.settings_panel.start_button.text() == "Start extraction"
+        assert first.settings_panel.mode_combo.itemText(0) == "One frame every N seconds"
+        assert first.settings_panel.interval_spin.suffix().strip() == "s"
+        assert first.queue_panel.title_label.text() == "Queue"
+        assert first.queue_panel.count_label.text() == "0 videos"
+        assert first.gallery.title_label.text() == "Results"
+        assert first.gallery.summary_label.text() == "No results yet"
+        assert first.status_label.text().startswith("Ready")
+        assert tr(FILE_DIALOG_FILTER).startswith("Video files")
+        assert tr(FILE_DIALOG_FILTER).endswith("All files (*)")
+    finally:
+        first.close()
+        qt_app.processEvents()
+
+    second = MainWindow(settings=settings)
+    try:
+        assert language() == "en"
+        assert second.file_menu.title() == "File"
+        assert second.language_actions["en"].isChecked() is True
+        assert second.settings_panel.start_button.text() == "Start extraction"
+
+        second.language_actions["id"].trigger()
+        qt_app.processEvents()
+        assert language() == "id"
+        assert settings.value("language") == "id"
+        assert second.file_menu.title() == "Berkas"
+        assert second.settings_panel.start_button.text() == "Mulai ekstraksi"
+    finally:
+        second.close()
+        set_language("id")
+        qt_app.processEvents()
+
+
+@pytest.mark.gui
+def test_language_switch_rerenders_queue_gallery_and_status(qt_app, tmp_path: Path) -> None:
+    from PySide6.QtCore import QSettings
+
+    from frame_extractor.core.models import FrameResult, VideoInfo
+    from frame_extractor.ui.i18n import language, set_language
+    from frame_extractor.ui.main_window import MainWindow
+    from frame_extractor.ui.models import QueueModel
+
+    settings = QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
+    set_language("id")
+    window = MainWindow(settings=settings)
+    path = tmp_path / "video.mp4"
+    info = VideoInfo(path, 65.0, 29.97, 320, 240, 1234, "h264")
+    frames = [
+        FrameResult(path, 1.0, 1, 1024),
+        FrameResult(path, 2.0, 2, 512),
+    ]
+    try:
+        model = window.queue_panel.model
+        model.add_paths([path])
+        model.update_entry(path, info=info, state="ready", detail="", detail_kind="media")
+        index = model.index(model.row_for_path(path), 0)
+        assert model.data(index, QueueModel.DetailRole) == "1 mnt 05 dtk · 320×240"
+
+        window.info_card.set_info(info)
+        assert window.info_card.duration.value.text() == "1 mnt 05 dtk"
+        assert window.info_card.frames.value.text() == "1.234"
+
+        model.update_entry(path, state="done", detail="", detail_kind="done", results=frames)
+        assert model.data(index, QueueModel.DetailRole) == "2 gambar · 1,5 KB"
+
+        window.gallery.set_results(frames, elapsed_s=65.0, expected_total=2)
+        assert window.gallery.summary_label.text() == "2 gambar · 1,5 KB · 1 mnt 05 dtk"
+
+        window._set_footer("Selesai · {n} gambar · {size}", n=2, size_bytes=1536)
+        window._set_eta(seconds=65)
+        window._set_count_total(1234)
+        assert window.status_label.text() == "Selesai · 2 gambar · 1,5 KB"
+        assert window.eta_label.text() == "sisa 1 mnt 05 dtk"
+        assert window.count_label.text() == "1.234"
+        window._set_count_progress(1234, 2000)
+        assert window.count_label.text() == "1.234/2.000"
+
+        window.language_actions["en"].trigger()
+        qt_app.processEvents()
+
+        assert language() == "en"
+        assert model.data(index, QueueModel.DetailRole) == "2 frames · 1.5 KB"
+        assert window.info_card.duration.value.text() == "1 min 05 s"
+        assert window.info_card.frames.value.text() == "1,234"
+        assert window.gallery.summary_label.text() == "2 frames · 1.5 KB · 1 min 05 s"
+        assert window.status_label.text() == "Done · 2 frames · 1.5 KB"
+        assert window.eta_label.text() == "remaining 1 min 05 s"
+        assert window.count_label.text() == "1,234/2,000"
+
+        window.language_actions["id"].trigger()
+        qt_app.processEvents()
+        assert model.data(index, QueueModel.DetailRole) == "2 gambar · 1,5 KB"
+        assert window.gallery.summary_label.text() == "2 gambar · 1,5 KB · 1 mnt 05 dtk"
+        assert window.count_label.text() == "1.234/2.000"
+    finally:
+        window.close()
+        set_language("id")
+        qt_app.processEvents()
+
+
+@pytest.mark.gui
+def test_settings_panel_rerenders_estimate_note_and_error(qt_app) -> None:
+    from frame_extractor.ui.i18n import set_language
+    from frame_extractor.ui.widgets.settings_panel import SettingsPanel
+
+    set_language("id")
+    panel = SettingsPanel()
+    try:
+        panel.set_estimate(1234, 1536, 65)
+        panel.set_note(
+            "Video ini lebih dari 2 jam. Perkiraan waktu ekstraksi ± {duration}; "
+            "proses berjalan di latar belakang.",
+            duration_s=65,
+        )
+        panel.set_error("Berkas tidak ditemukan: video.mp4")
+        assert panel.estimate_number.text() == "1.234 gambar"
+        assert panel.estimate_detail.text() == "± 1,5 KB · ± 1 mnt 05 dtk"
+        assert "1 mnt 05 dtk" in panel.note_label.text()
+        assert panel.error_label.text() == "Berkas tidak ditemukan: video.mp4"
+
+        set_language("en")
+        panel.retranslate()
+        assert panel.mode_combo.itemText(0) == "One frame every N seconds"
+        assert panel.interval_spin.suffix().strip() == "s"
+        assert panel.start_button.text() == "Start extraction"
+        assert panel.estimate_number.text() == "1,234 frames"
+        assert panel.estimate_detail.text() == "± 1.5 KB · ± 1 min 05 s"
+        assert "1 min 05 s" in panel.note_label.text()
+        assert panel.error_label.text() == "File not found: video.mp4"
+
+        set_language("id")
+        panel.retranslate()
+        assert panel.estimate_number.text() == "1.234 gambar"
+        assert panel.estimate_detail.text() == "± 1,5 KB · ± 1 mnt 05 dtk"
+        assert panel.error_label.text() == "Berkas tidak ditemukan: video.mp4"
+    finally:
+        panel.close()
+        set_language("id")
+        qt_app.processEvents()
+
+
+@pytest.mark.gui
+def test_error_dialog_and_core_messages_are_translated(qt_app) -> None:
+    from frame_extractor.ui.i18n import set_language, translate_message
+    from frame_extractor.ui.widgets.error_dialog import ErrorDialog
+
+    set_language("en")
+    dialog = ErrorDialog(
+        "Berkas tidak ditemukan",
+        "Berkas tidak ditemukan: video.mp4",
+        "Periksa apakah berkas dipindahkan atau namanya berubah.",
+        "FileNotFoundError: video.mp4",
+    )
+    try:
+        assert dialog.heading.text() == "File not found"
+        assert dialog.body.text() == "File not found: video.mp4"
+        assert (
+            dialog.advice_label.text()
+            == "Advice: Check whether the file was moved or renamed."
+        )
+        assert dialog.copy_button.text() == "Copy details"
+        assert dialog.close_button.text() == "Close"
+        assert dialog.detail_toggle.text() == "Show technical details"
+        dialog.detail_toggle.setChecked(True)
+        assert dialog.detail_toggle.text() == "Hide technical details"
+        assert translate_message("Folder keluaran tidak dapat dibuat: E:\\hasil") == (
+            "Could not create the output folder: E:\\hasil"
+        )
+        assert translate_message("Durasi video ini 10.0 detik; turunkan waktu mulai.") == (
+            "This video is 10.0 seconds long; lower the start time."
+        )
+    finally:
+        dialog.close()
+        set_language("id")
+        qt_app.processEvents()
+
+    assert translate_message("Berkas tidak ditemukan: video.mp4") == (
+        "Berkas tidak ditemukan: video.mp4"
+    )
+
+
+def test_humanize_english_formats_keep_indonesian_defaults() -> None:
+    from frame_extractor.core.humanize import eta_text, human_bytes, human_duration
+
+    assert human_bytes(1536) == "1,5 KB"
+    assert human_bytes(1536, "en") == "1.5 KB"
+    assert human_duration(65) == "1 mnt 05 dtk"
+    assert human_duration(65, "en") == "1 min 05 s"
+    assert eta_text(65) == "sisa 1 mnt 05 dtk"
+    assert eta_text(65, "en") == "remaining 1 min 05 s"
+    assert eta_text(None, "en") == "calculating remaining time…"

@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QVBoxLayout, QWidget
 
 from ...core.humanize import human_duration
 from ...core.models import VideoInfo
+from ..i18n import format_count, language, tr, translate_message
 
 
 class _Stat(QWidget):
@@ -15,29 +16,36 @@ class _Stat(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(2)
+        self._caption_source = caption
         self.value = QLabel("—")
         self.value.setObjectName("StatValue")
         self.value.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-        self.caption = QLabel(caption)
+        self.caption = QLabel()
         self.caption.setObjectName("StatCaption")
         layout.addWidget(self.value)
         layout.addWidget(self.caption)
-        self.setAccessibleName(caption)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        text = tr(self._caption_source)
+        self.caption.setText(text)
+        self.setAccessibleName(text)
 
 
 class VideoInfoCard(QFrame):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("Card")
+        self._info: VideoInfo | None = None
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
 
-        eyebrow = QLabel("VIDEO")
-        eyebrow.setObjectName("StatCaption")
-        layout.addWidget(eyebrow)
+        self.eyebrow = QLabel()
+        self.eyebrow.setObjectName("StatCaption")
+        layout.addWidget(self.eyebrow)
 
-        self.name_label = QLabel("Belum ada video")
+        self.name_label = QLabel()
         self.name_label.setObjectName("BrandTitle")
         self.name_label.setWordWrap(True)
         self.name_label.setTextInteractionFlags(
@@ -64,32 +72,51 @@ class VideoInfoCard(QFrame):
         self.warning.setWordWrap(True)
         self.warning.hide()
         layout.addWidget(self.warning)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        self.eyebrow.setText(tr("VIDEO"))
+        for stat in (self.duration, self.fps, self.resolution, self.frames, self.codec):
+            stat.retranslate()
+        if self._info is None:
+            self.name_label.setText(tr("Belum ada video"))
+        elif self._info.warnings:
+            self.warning.setText(
+                "\n".join(translate_message(item) for item in self._info.warnings)
+            )
+        self._render_values()
 
     def set_info(self, info: VideoInfo | None) -> None:
+        self._info = info
+        self.retranslate()
         if info is None:
-            self.name_label.setText("Belum ada video")
-            for stat in (
-                self.duration,
-                self.fps,
-                self.resolution,
-                self.frames,
-                self.codec,
-            ):
-                stat.value.setText("—")
-            self.warning.hide()
             self.setToolTip("")
+            self.warning.hide()
             return
 
         self.name_label.setText(info.path.name)
         self.name_label.setToolTip(str(info.path))
         self.setToolTip(str(info.path))
-        self.duration.value.setText(human_duration(info.duration_s))
-        self.fps.value.setText(f"{info.fps:.2f}")
-        self.resolution.value.setText(f"{info.width}×{info.height}")
-        self.frames.value.setText(f"{info.frame_count:,}".replace(",", "."))
-        self.codec.value.setText(info.codec.upper())
         if info.warnings:
-            self.warning.setText("\n".join(info.warnings))
+            self.warning.setText(
+                "\n".join(translate_message(item) for item in info.warnings)
+            )
             self.warning.show()
         else:
             self.warning.hide()
+
+    def _render_values(self) -> None:
+        info = self._info
+        if info is None:
+            for stat in (self.duration, self.fps, self.resolution, self.frames, self.codec):
+                stat.value.setText("—")
+            self.warning.hide()
+            return
+        self.duration.value.setText(human_duration(info.duration_s, language()))
+        self.fps.value.setText(f"{info.fps:.2f}")
+        self.resolution.value.setText(f"{info.width}×{info.height}")
+        self.frames.value.setText(format_count(info.frame_count))
+        self.codec.value.setText(info.codec.upper())
+
+
+__all__ = ["VideoInfoCard"]

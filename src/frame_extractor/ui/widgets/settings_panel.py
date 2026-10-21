@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 from ...core.errors import InvalidOptionError
 from ...core.humanize import human_bytes, human_duration
 from ...core.models import ExtractOptions, Format, Mode, VideoInfo
+from ..i18n import language, tr, translate_message
 
 DEFAULT_TEMPLATE = "{stem}_{index:06d}_{time}.{ext}"
 
@@ -51,6 +52,13 @@ class SettingsPanel(QFrame):
         self._running = False
         self._start_ready = False
         self._controls: list[QWidget] = []
+        self._labels: list[tuple[QLabel, str]] = []
+        self._estimate_count: int | None = None
+        self._estimate_size: int | None = None
+        self._estimate_duration: float | None = None
+        self._note_source = ""
+        self._note_kwargs: dict[str, object] = {}
+        self._error_source = ""
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -75,8 +83,7 @@ class SettingsPanel(QFrame):
         self.scroll_area.setWidget(content)
         outer.addWidget(self.scroll_area, 1)
 
-        title = QLabel("Setelan")
-        title.setObjectName("SectionTitle")
+        title = self._label("Setelan", "SectionTitle")
         layout.addWidget(title)
 
         self.mode_combo = QComboBox()
@@ -85,8 +92,7 @@ class SettingsPanel(QFrame):
         )
         self.mode_combo.setMinimumContentsLength(18)
         for value, label in MODE_LABELS:
-            self.mode_combo.addItem(label, value)
-        self.mode_combo.setAccessibleName("Mode pengambilan frame")
+            self.mode_combo.addItem(tr(label), value)
         self.mode_combo.currentIndexChanged.connect(self._on_mode_changed)
         layout.addWidget(self._labelled("Mode", self.mode_combo, top=True))
         self._controls.append(self.mode_combo)
@@ -98,13 +104,9 @@ class SettingsPanel(QFrame):
         )
         self.mode_stack.setMinimumHeight(76)
         self.interval_spin = self._double_spin(0.05, 86_400.0, 1.0, 2, " dtk")
-        self.interval_spin.setToolTip("Ambil satu frame setiap N detik")
         self.count_spin = self._int_spin(1, 200_000, 30)
-        self.count_spin.setToolTip("Jumlah frame yang disebar merata sepanjang video")
         self.start_spin = self._double_spin(0.0, 86_400.0, 0.0, 2, " dtk")
         self.end_spin = self._double_spin(0.01, 86_400.0, 10.0, 2, " dtk")
-        self.start_spin.setToolTip("Awal rentang yang diambil")
-        self.end_spin.setToolTip("Akhir rentang (tidak termasuk)")
 
         self.mode_stack.addWidget(self._inline("Tiap", self.interval_spin))
         self.mode_stack.addWidget(self._inline("Jumlah", self.count_spin))
@@ -117,9 +119,8 @@ class SettingsPanel(QFrame):
             QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
         )
         self.format_combo.setMinimumContentsLength(16)
-        self.format_combo.addItem("PNG — lossless", "png")
-        self.format_combo.addItem("JPG — lebih kecil", "jpg")
-        self.format_combo.setAccessibleName("Format gambar")
+        self.format_combo.addItem(tr("PNG — lossless"), "png")
+        self.format_combo.addItem(tr("JPG — lebih kecil"), "jpg")
         self.format_combo.currentIndexChanged.connect(self._on_format_changed)
         layout.addWidget(self._labelled("Format", self.format_combo, top=True))
         self._controls.append(self.format_combo)
@@ -129,37 +130,29 @@ class SettingsPanel(QFrame):
         quality_layout.setContentsMargins(0, 0, 0, 0)
         quality_layout.setSpacing(4)
         quality_header = QHBoxLayout()
-        quality_label = QLabel("Kualitas JPG")
-        quality_label.setObjectName("Muted")
+        quality_label = self._label("Kualitas JPG", "Muted")
         quality_header.addWidget(quality_label)
         quality_header.addStretch(1)
         self.quality_spin = self._int_spin(1, 100, 95)
         self.quality_spin.setFixedWidth(80)
-        self.quality_spin.setAccessibleName("Kualitas JPEG")
         quality_header.addWidget(self.quality_spin)
         quality_layout.addLayout(quality_header)
         self.quality_slider = QSlider(Qt.Orientation.Horizontal)
         self.quality_slider.setRange(1, 100)
         self.quality_slider.setValue(95)
-        self.quality_slider.setAccessibleName("Slider kualitas JPEG")
         self.quality_slider.setMinimumHeight(24)
         quality_layout.addWidget(self.quality_slider)
         layout.addWidget(self.quality_widget)
         self._controls.extend([self.quality_slider, self.quality_spin])
 
         self.out_edit = QLineEdit()
-        self.out_edit.setPlaceholderText("Di samping berkas video")
         self.out_edit.setClearButtonEnabled(True)
-        self.out_edit.setAccessibleName("Folder keluaran")
-        self.out_edit.setToolTip("Kosongkan untuk menyimpan di folder yang sama dengan video")
         self.out_edit.editingFinished.connect(self._emit_changed)
         folder_row = QHBoxLayout()
         folder_row.setSpacing(6)
         folder_row.addWidget(self.out_edit, 1)
         self.browse_button = QToolButton()
         self.browse_button.setText("…")
-        self.browse_button.setToolTip("Pilih folder keluaran")
-        self.browse_button.setAccessibleName("Pilih folder keluaran")
         self.browse_button.clicked.connect(self._browse_folder)
         folder_row.addWidget(self.browse_button)
         layout.addWidget(self._labelled("Folder keluaran", self._make_row(folder_row), top=True))
@@ -169,13 +162,12 @@ class SettingsPanel(QFrame):
         separator.setObjectName("Separator")
         layout.addWidget(separator)
 
-        estimate_caption = QLabel("PERKIRAAN")
-        estimate_caption.setObjectName("StatCaption")
+        estimate_caption = self._label("PERKIRAAN", "StatCaption")
         layout.addWidget(estimate_caption)
         self.estimate_number = QLabel("—")
         self.estimate_number.setObjectName("EstimateNumber")
         layout.addWidget(self.estimate_number)
-        self.estimate_detail = QLabel("Pilih video untuk melihat perkiraan.")
+        self.estimate_detail = QLabel()
         self.estimate_detail.setObjectName("Muted")
         self.estimate_detail.setWordWrap(True)
         layout.addWidget(self.estimate_detail)
@@ -199,15 +191,13 @@ class SettingsPanel(QFrame):
         footer_layout.setContentsMargins(20, 0, 20, 18)
         footer_layout.setSpacing(8)
 
-        self.start_button = QPushButton("Mulai ekstraksi")
+        self.start_button = QPushButton()
         self.start_button.setObjectName("Primary")
-        self.start_button.setToolTip("Mulai mengekstrak semua video di antrean (Ctrl+Enter)")
         self.start_button.setEnabled(False)
         self.start_button.clicked.connect(self.startRequested)
         footer_layout.addWidget(self.start_button)
 
-        hint = QLabel("Ctrl+Enter untuk mulai · Esc untuk membatalkan")
-        hint.setObjectName("StatCaption")
+        hint = self._label("Ctrl+Enter untuk mulai · Esc untuk membatalkan", "StatCaption")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         hint.setWordWrap(True)
         footer_layout.addWidget(hint)
@@ -222,15 +212,57 @@ class SettingsPanel(QFrame):
         self.end_spin.valueChanged.connect(self._emit_changed)
         self._sync_mode()
         self._sync_quality()
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        for label, source in self._labels:
+            label.setText(tr(source))
+        for index, (_, source) in enumerate(MODE_LABELS):
+            self.mode_combo.setItemText(index, tr(source))
+        self.format_combo.setItemText(0, tr("PNG — lossless"))
+        self.format_combo.setItemText(1, tr("JPG — lebih kecil"))
+        self.mode_combo.setAccessibleName(tr("Mode pengambilan frame"))
+        self.format_combo.setAccessibleName(tr("Format gambar"))
+        self.interval_spin.setToolTip(tr("Ambil satu frame setiap N detik"))
+        self.count_spin.setToolTip(
+            tr("Jumlah frame yang disebar merata sepanjang video")
+        )
+        self.start_spin.setToolTip(tr("Awal rentang yang diambil"))
+        self.end_spin.setToolTip(tr("Akhir rentang (tidak termasuk)"))
+        for spin in (self.interval_spin, self.start_spin, self.end_spin):
+            spin.setSuffix(tr(" dtk"))
+        self.quality_spin.setAccessibleName(tr("Kualitas JPEG"))
+        self.quality_slider.setAccessibleName(tr("Slider kualitas JPEG"))
+        self.out_edit.setPlaceholderText(tr("Di samping berkas video"))
+        self.out_edit.setAccessibleName(tr("Folder keluaran"))
+        self.out_edit.setToolTip(
+            tr("Kosongkan untuk menyimpan di folder yang sama dengan video")
+        )
+        self.browse_button.setToolTip(tr("Pilih folder keluaran"))
+        self.browse_button.setAccessibleName(tr("Pilih folder keluaran"))
+        self.start_button.setToolTip(
+            tr("Mulai mengekstrak semua video di antrean (Ctrl+Enter)")
+        )
+        self._render_start_button()
+        self._render_estimate()
+        self._render_note()
+        self._render_error()
 
     # ---------------------------------------------------------------- helpers
+    def _label(self, text: str, object_name: str | None = None) -> QLabel:
+        label = QLabel()
+        if object_name:
+            label.setObjectName(object_name)
+        self._labels.append((label, text))
+        label.setText(tr(text))
+        return label
+
     def _labelled(self, text: str, widget: QWidget, *, top: bool = False) -> QWidget:
         container = QWidget()
         layout = QVBoxLayout(container) if top else QHBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6 if top else 8)
-        label = QLabel(text)
-        label.setObjectName("Muted")
+        label = self._label(text, "Muted")
         label.setBuddy(widget)
         if top:
             layout.addWidget(label)
@@ -250,8 +282,7 @@ class SettingsPanel(QFrame):
         row = QHBoxLayout(container)
         row.setContentsMargins(0, 0, 0, 0)
         row.setSpacing(8)
-        label = QLabel(label_text)
-        label.setObjectName("Muted")
+        label = self._label(label_text, "Muted")
         label.setBuddy(spin)
         row.addWidget(label)
         row.addWidget(spin, 1)
@@ -264,11 +295,9 @@ class SettingsPanel(QFrame):
         grid.setHorizontalSpacing(8)
         grid.setVerticalSpacing(6)
         grid.setColumnStretch(1, 1)
-        start_label = QLabel("Mulai")
-        start_label.setObjectName("Muted")
+        start_label = self._label("Mulai", "Muted")
         start_label.setBuddy(self.start_spin)
-        end_label = QLabel("Selesai")
-        end_label.setObjectName("Muted")
+        end_label = self._label("Akhir", "Muted")
         end_label.setBuddy(self.end_spin)
         grid.addWidget(start_label, 0, 0)
         grid.addWidget(self.start_spin, 0, 1)
@@ -387,8 +416,16 @@ class SettingsPanel(QFrame):
         for control in self._controls:
             control.setEnabled(not running)
         self.start_button.setEnabled(not running and self._start_ready)
-        self.start_button.setText("Memproses…" if running else "Mulai ekstraksi")
-        self.error_label.setVisible(False if running else self.error_label.isVisible())
+        self._render_start_button()
+        if running:
+            self.error_label.hide()
+        else:
+            self._render_error()
+
+    def _render_start_button(self) -> None:
+        self.start_button.setText(
+            tr("Memproses…") if self._running else tr("Mulai ekstraksi")
+        )
 
     def set_start_enabled(self, enabled: bool) -> None:
         self._start_ready = bool(enabled)
@@ -400,27 +437,54 @@ class SettingsPanel(QFrame):
         size_bytes: int | None = None,
         duration_s: float | None = None,
     ) -> None:
+        self._estimate_count = count
+        self._estimate_size = size_bytes
+        self._estimate_duration = duration_s
+        self._render_estimate()
+
+    def _render_estimate(self) -> None:
+        count = self._estimate_count
         if count is None:
             self.estimate_number.setText("—")
-            self.estimate_detail.setText("Pilih video untuk melihat perkiraan.")
+            self.estimate_detail.setText(tr("Pilih video untuk melihat perkiraan."))
             return
-        self.estimate_number.setText(f"{count:,} gambar".replace(",", "."))
+        self.estimate_number.setText(tr("{n} gambar", n=count))
         parts = []
-        if size_bytes:
-            parts.append(f"± {human_bytes(size_bytes)}")
-        if duration_s:
-            parts.append(f"± {human_duration(duration_s)}")
-        self.estimate_detail.setText(" · ".join(parts) if parts else "Siap diekstrak.")
+        if self._estimate_size:
+            parts.append(f"± {human_bytes(self._estimate_size, language())}")
+        if self._estimate_duration:
+            parts.append(f"± {human_duration(self._estimate_duration, language())}")
+        self.estimate_detail.setText(" · ".join(parts) if parts else tr("Siap diekstrak."))
 
-    def set_note(self, text: str) -> None:
+    def set_note(self, text: str, **kwargs: object) -> None:
+        self._note_source = text
+        self._note_kwargs = dict(kwargs)
+        self._render_note()
+
+    def _render_note(self) -> None:
+        if self._note_source:
+            values = dict(self._note_kwargs)
+            if "duration_s" in values:
+                values["duration"] = human_duration(
+                    float(values.pop("duration_s")), language()
+                )
+            text = tr(self._note_source, **values)
+        else:
+            text = ""
         self.note_label.setText(text)
         self.note_label.setVisible(bool(text))
 
     def set_error(self, text: str) -> None:
+        self._error_source = text
+        self._render_error()
+
+    def _render_error(self) -> None:
+        text = translate_message(self._error_source) if self._error_source else ""
         self.error_label.setText(text)
-        self.error_label.setVisible(bool(text))
+        self.error_label.setVisible(bool(text) and not self._running)
 
     def clear_error(self) -> None:
+        self._error_source = ""
         self.error_label.clear()
         self.error_label.hide()
 
@@ -458,7 +522,7 @@ class SettingsPanel(QFrame):
     # ------------------------------------------------------------------ folder
     def _browse_folder(self) -> None:
         start = self.out_edit.text().strip() or str(Path.home())
-        folder = QFileDialog.getExistingDirectory(self, "Pilih folder keluaran", start)
+        folder = QFileDialog.getExistingDirectory(self, tr("Pilih folder keluaran"), start)
         if folder:
             self.out_edit.setText(folder)
             self._emit_changed()

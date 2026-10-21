@@ -1,9 +1,17 @@
-"""Pemformatan angka untuk UI dan CLI (Bahasa Indonesia)."""
+"""Pemformatan angka untuk UI dan CLI.
+
+Bahasa Indonesia tetap menjadi default agar keluaran CLI tidak berubah.
+Antarmuka dapat meminta format Inggris dengan ``lang="en"``.
+"""
 
 from __future__ import annotations
 
 
-def human_bytes(size: float) -> str:
+def _english(lang: str) -> bool:
+    return str(lang).lower().startswith("en")
+
+
+def human_bytes(size: float, lang: str = "id") -> str:
     units = ["B", "KB", "MB", "GB", "TB"]
     value = float(max(0, size))
     for unit in units:
@@ -11,15 +19,23 @@ def human_bytes(size: float) -> str:
             if unit == "B":
                 return f"{int(value)} B"
             text = f"{value:.1f}".rstrip("0").rstrip(".")
-            return f"{text.replace('.', ',')} {unit}"
+            if not _english(lang):
+                text = text.replace(".", ",")
+            return f"{text} {unit}"
         value /= 1024
     return f"{value:.1f} TB"
 
 
-def human_duration(seconds: float) -> str:
+def human_duration(seconds: float, lang: str = "id") -> str:
     total = max(0, int(round(seconds)))
     hours, remainder = divmod(total, 3600)
     minutes, secs = divmod(remainder, 60)
+    if _english(lang):
+        if hours:
+            return f"{hours} h {minutes:02d} min"
+        if minutes:
+            return f"{minutes} min {secs:02d} s"
+        return f"{secs} s"
     if hours:
         return f"{hours} j {minutes:02d} mnt"
     if minutes:
@@ -27,9 +43,11 @@ def human_duration(seconds: float) -> str:
     return f"{secs} dtk"
 
 
-def eta_text(seconds: float | None) -> str:
+def eta_text(seconds: float | None, lang: str = "id") -> str:
+    english = _english(lang)
     if seconds is None:
-        return "menghitung sisa waktu…"
+        return "calculating remaining time…" if english else "menghitung sisa waktu…"
     if seconds <= 0:
-        return "hampir selesai"
-    return f"sisa {human_duration(seconds)}"
+        return "almost done" if english else "hampir selesai"
+    duration = human_duration(seconds, lang)
+    return f"remaining {duration}" if english else f"sisa {duration}"

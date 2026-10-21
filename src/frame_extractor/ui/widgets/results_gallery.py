@@ -32,6 +32,7 @@ from PySide6.QtWidgets import (
 
 from ...core.humanize import human_bytes, human_duration
 from ...core.models import FrameResult
+from ..i18n import format_count, language, tr
 from ..models import ResultsModel, ThumbnailSignals, ThumbnailTask
 from ..theme import PALETTES
 
@@ -88,7 +89,7 @@ class ResultsDelegate(QStyledItemDelegate):
             small = QFont(option.font)
             small.setPixelSize(10)
             painter.setFont(small)
-            painter.drawText(thumb, Qt.AlignmentFlag.AlignCenter, "memuat…")
+            painter.drawText(thumb, Qt.AlignmentFlag.AlignCenter, tr("memuat…"))
 
         name = str(index.data(int(Qt.ItemDataRole.DisplayRole)) or "")
         font = QFont(option.font)
@@ -123,6 +124,10 @@ class ResultsGallery(QWidget):
         super().__init__(parent)
         self._generation = 0
         self._results: list[FrameResult] = []
+        self._elapsed_s = 0.0
+        self._expected_total: int | None = None
+        self._cancelled = False
+        self._has_run = False
         self._signals = ThumbnailSignals(self)
         self._signals.ready.connect(self._on_thumbnail)
         self._pool = QThreadPool(self)
@@ -134,15 +139,14 @@ class ResultsGallery(QWidget):
 
         header = QHBoxLayout()
         header.setSpacing(10)
-        title = QLabel("Hasil")
-        title.setObjectName("SectionTitle")
-        header.addWidget(title)
-        self.summary_label = QLabel("Belum ada hasil")
+        self.title_label = QLabel()
+        self.title_label.setObjectName("SectionTitle")
+        header.addWidget(self.title_label)
+        self.summary_label = QLabel()
         self.summary_label.setObjectName("Muted")
         self.summary_label.setWordWrap(True)
         header.addWidget(self.summary_label, 1)
-        self.open_button = QPushButton("Buka folder")
-        self.open_button.setToolTip("Buka folder hasil di pengelola berkas")
+        self.open_button = QPushButton()
         self.open_button.clicked.connect(self.openFolderRequested)
         header.addWidget(self.open_button)
         layout.addLayout(header)
@@ -170,11 +174,53 @@ class ResultsGallery(QWidget):
         self.view.setItemDelegate(ResultsDelegate(self.view))
         layout.addWidget(self.view, 1)
 
-        self.empty_label = QLabel("Belum ada gambar. Jalankan ekstraksi untuk melihat hasil.")
+        self.empty_label = QLabel()
         self.empty_label.setObjectName("Muted")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.empty_label.hide()
         layout.addWidget(self.empty_label)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        self.title_label.setText(tr("Hasil"))
+        self.open_button.setText(tr("Buka folder"))
+        self.open_button.setToolTip(tr("Buka folder hasil di pengelola berkas"))
+        self.open_button.setAccessibleName(tr("Buka folder hasil"))
+        self.view.setAccessibleName(tr("Galeri hasil ekstraksi"))
+        self.empty_label.setText(
+            tr("Belum ada gambar. Jalankan ekstraksi untuk melihat hasil.")
+        )
+        self._render_summary()
+        self.view.viewport().update()
+
+    def _render_summary(self) -> None:
+        total_size = sum(item.size_bytes for item in self._results)
+        if not self._has_run:
+            summary = tr("Belum ada hasil")
+        elif self._cancelled:
+            if self._expected_total:
+                summary = tr(
+                    "Dibatalkan · {n} dari {total} gambar tersimpan · {size}",
+                    n=len(self._results),
+                    total=format_count(self._expected_total),
+                    size=human_bytes(total_size, language()),
+                )
+            else:
+                summary = tr(
+                    "Dibatalkan · {n} gambar tersimpan · {size}",
+                    n=len(self._results),
+                    size=human_bytes(total_size, language()),
+                )
+        elif self._results:
+            summary = tr(
+                "{n} gambar · {size} · {duration}",
+                n=len(self._results),
+                size=human_bytes(total_size, language()),
+                duration=human_duration(self._elapsed_s, language()),
+            )
+        else:
+            summary = tr("Tidak ada gambar yang dihasilkan")
+        self.summary_label.setText(summary)
 
     def set_results(
         self,
@@ -188,32 +234,16 @@ class ResultsGallery(QWidget):
         generation = self._generation
         self._pool.clear()
         self._results = list(results)
+        self._elapsed_s = elapsed_s
+        self._expected_total = expected_total
+        self._cancelled = cancelled
+        self._has_run = True
         self.model.set_results(self._results)
         self.view.setVisible(bool(self._results))
         self.empty_label.setVisible(not self._results)
         self.open_button.setEnabled(bool(self._results))
         self.view.scrollToTop()
-
-        total_size = sum(item.size_bytes for item in self._results)
-        if cancelled:
-            if expected_total:
-                summary = (
-                    f"Dibatalkan · {len(self._results)} dari {expected_total} gambar tersimpan "
-                    f"· {human_bytes(total_size)}"
-                )
-            else:
-                summary = (
-                    f"Dibatalkan · {len(self._results)} gambar tersimpan "
-                    f"· {human_bytes(total_size)}"
-                )
-        elif self._results:
-            summary = (
-                f"{len(self._results):,} gambar".replace(",", ".")
-                + f" · {human_bytes(total_size)} · {human_duration(elapsed_s)}"
-            )
-        else:
-            summary = "Tidak ada gambar yang dihasilkan"
-        self.summary_label.setText(summary)
+        self._render_summary()
 
         for row, result in enumerate(self._results):
             self._pool.start(

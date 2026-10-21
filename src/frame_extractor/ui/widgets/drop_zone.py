@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..i18n import tr
+
 
 class _FilmIcon(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
@@ -64,10 +66,6 @@ class DropZone(QFrame):
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMinimumHeight(320)
-        self.setAccessibleName("Zona jatuh berkas video")
-        self.setAccessibleDescription(
-            "Jatuhkan berkas video atau folder ke sini, atau tekan Enter untuk memilih berkas."
-        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(40, 48, 40, 48)
@@ -81,45 +79,67 @@ class DropZone(QFrame):
         icon_row.addStretch(1)
         layout.addLayout(icon_row)
 
-        title = QLabel("Jatuhkan video atau folder di sini")
-        title.setObjectName("BrandTitle")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setWordWrap(True)
-        layout.addWidget(title)
+        self.title_label = QLabel()
+        self.title_label.setObjectName("BrandTitle")
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.title_label.setWordWrap(True)
+        layout.addWidget(self.title_label)
 
-        subtitle = QLabel("atau klik area ini untuk memilih berkas dari komputer")
-        subtitle.setObjectName("Muted")
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        subtitle.setWordWrap(True)
-        layout.addWidget(subtitle)
+        self.subtitle_label = QLabel()
+        self.subtitle_label.setObjectName("Muted")
+        self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.subtitle_label.setWordWrap(True)
+        layout.addWidget(self.subtitle_label)
 
-        formats = QLabel("MP4 · MKV · MOV · WebM · AVI · MPEG · MTS · dan lainnya")
-        formats.setObjectName("StatCaption")
-        formats.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        formats.setWordWrap(True)
-        layout.addWidget(formats)
+        self.formats_label = QLabel()
+        self.formats_label.setObjectName("StatCaption")
+        self.formats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.formats_label.setWordWrap(True)
+        layout.addWidget(self.formats_label)
 
         layout.addSpacing(10)
 
         buttons = QHBoxLayout()
         buttons.setSpacing(10)
         buttons.addStretch(1)
-        self.choose_button = QPushButton("Pilih video")
+        self.choose_button = QPushButton()
         self.choose_button.setObjectName("Primary")
         self.choose_button.setMinimumWidth(150)
-        self.choose_button.setToolTip("Buka dialog pemilih berkas (Ctrl+O)")
         self.choose_button.clicked.connect(self.browseFiles)
         buttons.addWidget(self.choose_button)
 
-        self.folder_button = QPushButton("Pilih folder")
+        self.folder_button = QPushButton()
         self.folder_button.setMinimumWidth(130)
-        self.folder_button.setToolTip("Tambahkan semua video di dalam sebuah folder")
         self.folder_button.clicked.connect(self.browseFolder)
         buttons.addWidget(self.folder_button)
         buttons.addStretch(1)
         layout.addLayout(buttons)
 
         layout.addStretch(1)
+        self.retranslate()
+
+    def retranslate(self) -> None:
+        self.setAccessibleName(tr("Zona jatuh berkas video"))
+        self.setAccessibleDescription(
+            tr(
+                "Jatuhkan berkas video atau folder ke sini, atau tekan Enter untuk memilih berkas."
+            )
+        )
+        self.title_label.setText(tr("Jatuhkan video atau folder di sini"))
+        self.subtitle_label.setText(
+            tr("atau klik area ini untuk memilih berkas dari komputer")
+        )
+        self.formats_label.setText(
+            tr("MP4 · MKV · MOV · WebM · AVI · MPEG · MTS · dan lainnya")
+        )
+        self.choose_button.setText(tr("Pilih video"))
+        self.choose_button.setToolTip(tr("Buka dialog pemilih berkas (Ctrl+O)"))
+        self.choose_button.setAccessibleName(tr("Pilih video"))
+        self.folder_button.setText(tr("Pilih folder"))
+        self.folder_button.setToolTip(
+            tr("Tambahkan semua video di dalam sebuah folder")
+        )
+        self.folder_button.setAccessibleName(tr("Pilih folder"))
 
     def _set_drag_active(self, active: bool) -> None:
         self.setProperty("dragActive", active)

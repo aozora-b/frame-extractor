@@ -8,9 +8,10 @@ from pathlib import Path
 from PySide6.QtCore import QAbstractListModel, QModelIndex, QObject, QRunnable, QSize, Qt, Signal
 from PySide6.QtGui import QImage, QImageReader, QPixmap
 
-from ..core.humanize import human_bytes
+from ..core.humanize import human_bytes, human_duration
 from ..core.models import FrameResult, VideoInfo
 from ..core.naming import format_time
+from .i18n import language, tr, translate_message
 
 
 @dataclass
@@ -19,7 +20,42 @@ class QueueEntry:
     info: VideoInfo | None = None
     state: str = "waiting"
     detail: str = ""
+    detail_kind: str = ""
+    detail_args: dict[str, object] = field(default_factory=dict)
     results: list[FrameResult] = field(default_factory=list)
+
+    def detail_text(self) -> str:
+        """Render detail with the active language, including humanized values."""
+
+        if self.detail_kind == "media" and self.info is not None:
+            return tr(
+                "{duration} · {width}×{height}",
+                duration=human_duration(self.info.duration_s, language()),
+                width=self.info.width,
+                height=self.info.height,
+            )
+        if self.detail_kind == "done":
+            size = sum(item.size_bytes for item in self.results)
+            return tr(
+                "{n} gambar · {size}",
+                n=len(self.results),
+                size=human_bytes(size, language()),
+            )
+        if self.detail_kind == "cancelled":
+            saved = int(self.detail_args.get("saved", len(self.results)))
+            total = int(self.detail_args.get("total", 0))
+            if total:
+                return tr(
+                    "{saved} dari {n} gambar tersimpan",
+                    saved=saved,
+                    n=total,
+                )
+            return tr("{n} gambar tersimpan", n=saved)
+        if self.detail_kind == "not_run":
+            return tr("Tidak dijalankan")
+        if self.state == "error":
+            return translate_message(self.detail)
+        return self.detail
 
 
 class QueueModel(QAbstractListModel):
@@ -49,15 +85,16 @@ class QueueModel(QAbstractListModel):
                     f"\n{entry.info.width}×{entry.info.height} · "
                     f"{entry.info.fps:.2f} fps · {entry.info.codec}"
                 )
-            if entry.detail:
-                text += f"\n{entry.detail}"
+            detail = entry.detail_text()
+            if detail:
+                text += f"\n{detail}"
             return text
         if role == self.PathRole:
             return str(entry.path)
         if role == self.StateRole:
             return entry.state
         if role == self.DetailRole:
-            return entry.detail
+            return entry.detail_text()
         return None
 
     def roleNames(self):  # noqa: N802
@@ -111,6 +148,8 @@ class QueueModel(QAbstractListModel):
         info: VideoInfo | None | object = ...,
         state: str | None = None,
         detail: str | None = None,
+        detail_kind: str | None | object = ...,
+        detail_args: dict[str, object] | None = None,
         results: list[FrameResult] | None = None,
     ) -> None:
         row = self.row_for_path(path)
@@ -123,6 +162,12 @@ class QueueModel(QAbstractListModel):
             entry.state = state
         if detail is not None:
             entry.detail = detail
+            if detail_kind is ...:
+                entry.detail_kind = ""
+                entry.detail_args = {}
+        if detail_kind is not ...:
+            entry.detail_kind = str(detail_kind or "")
+            entry.detail_args = dict(detail_args or {})
         if results is not None:
             entry.results = results
         index = self.index(row, 0)
@@ -142,6 +187,8 @@ class QueueModel(QAbstractListModel):
             if entry.state in retryable:
                 entry.state = "waiting"
                 entry.detail = ""
+                entry.detail_kind = ""
+                entry.detail_args = {}
                 entry.results = []
             if entry.state != "done":
                 pending = True
@@ -188,7 +235,11 @@ class ResultsModel(QAbstractListModel):
         if role == int(Qt.ItemDataRole.ToolTipRole):
             return (
                 f"{result.path}\n"
-                f"Waktu {format_time(result.timestamp_s)} · {human_bytes(result.size_bytes)}"
+                + tr(
+                    "Waktu {time} · {size}",
+                    time=format_time(result.timestamp_s),
+                    size=human_bytes(result.size_bytes, language()),
+                )
             )
         if role == int(Qt.ItemDataRole.DecorationRole):
             return self._thumbnails.get(index.row())

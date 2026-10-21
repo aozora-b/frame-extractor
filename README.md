@@ -30,7 +30,9 @@ Status build lokal Windows: `--onedir` 572,9 MiB (ZIP 241,9 MB) dan `--onefile` 
 
 ![Demo singkat alur ekstraksi](assets/demo.gif)
 
-Pintasan: `Ctrl+O` buka video, `Ctrl+Shift+O` tambah ke antrean, `Delete` hapus video terpilih, `Ctrl+Enter` mulai, `Esc` batal, `Ctrl+Q` keluar. Setelan, tema, dan ukuran jendela diingat lewat `QSettings`.
+Pintasan: `Ctrl+O` buka video, `Ctrl+Shift+O` tambah ke antrean, `Delete` hapus video terpilih, `Ctrl+Enter` mulai, `Esc` batal, `Ctrl+Q` keluar. Setelan, tema, bahasa, dan ukuran jendela diingat lewat `QSettings`.
+
+Antarmuka tersedia dalam Bahasa Indonesia (bawaan) dan Inggris. Buka **Tampilan → Bahasa** untuk beralih tanpa memulai ulang aplikasi.
 
 ## Format yang didukung
 

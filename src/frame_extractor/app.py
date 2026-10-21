@@ -18,6 +18,7 @@ from .core.extract import extract
 from .core.models import ExtractOptions
 from .core.probe import probe
 from .logging_setup import configure_logging, get_log_path
+from .ui.i18n import DEFAULT_LANGUAGE, normalize_language, set_language, tr
 from .ui.main_window import MainWindow
 from .ui.theme import app_icon
 
@@ -119,11 +120,14 @@ def _install_exception_hook(*, show_dialog: bool = True) -> None:
             return
         QMessageBox.critical(
             None,
-            "Kesalahan tak terduga",
-            "Aplikasi mengalami kesalahan yang tidak terduga.\n\n"
-            f"Detail lengkap tercatat di log:\n{get_log_path()}\n\n"
-            "Anda dapat melanjutkan, tetapi sebaiknya simpan pekerjaan dan "
-            "jalankan ulang aplikasi.",
+            tr("Kesalahan tak terduga"),
+            tr(
+                "Aplikasi mengalami kesalahan yang tidak terduga.\n\n"
+                "Detail lengkap tercatat di log:\n{path}\n\n"
+                "Anda dapat melanjutkan, tetapi sebaiknya simpan pekerjaan dan "
+                "jalankan ulang aplikasi.",
+                path=get_log_path(),
+            ),
         )
 
     sys.excepthook = hook
@@ -148,10 +152,11 @@ def main(argv: list[str] | None = None) -> int:
         app.setDesktopFileName("frame-extractor")
 
     configure_logging()
+    settings = QSettings(ORG_NAME, APP_NAME)
+    set_language(normalize_language(settings.value("language", DEFAULT_LANGUAGE)))
     _install_exception_hook(show_dialog=not args.smoke_test)
     log.info("Frame Extractor %s dimulai", __version__)
 
-    settings = QSettings(ORG_NAME, APP_NAME)
     try:
         window = MainWindow(settings)
     except Exception:
@@ -159,9 +164,12 @@ def main(argv: list[str] | None = None) -> int:
         if not args.smoke_test:
             QMessageBox.critical(
                 None,
-                "Aplikasi gagal dimulai",
-                "Jendela utama tidak dapat dibuka.\n\n"
-                f"Detail lengkap tercatat di log:\n{get_log_path()}",
+                tr("Aplikasi gagal dimulai"),
+                tr(
+                    "Jendela utama tidak dapat dibuka.\n\n"
+                    "Detail lengkap tercatat di log:\n{path}",
+                    path=get_log_path(),
+                ),
             )
         return 1
     window.show()

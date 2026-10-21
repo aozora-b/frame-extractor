@@ -34,13 +34,14 @@ Tag target: `v1.0.0` (belum dibuat)
 
 ## 3. Bukti pengujian otomatis
 
-- [x] `python -m pytest` — **97 passed** (4,71 detik), termasuk tes integrasi
-      ffmpeg/OpenCV, pembatalan, CLI, GUI offscreen, dan kontras tema WCAG AA.
+- [x] `python -m pytest` — **111 passed** (7,37 detik), termasuk tes integrasi
+      ffmpeg/OpenCV, pembatalan, CLI, GUI offscreen, kontras tema WCAG AA, dan
+      pengalihan bahasa Indonesia/Inggris beserta persistensinya.
 - [x] `python -m ruff check src tests tools` — tidak ada temuan.
 - [x] Uji GUI sumber (`tools/gui_smoke.py` melalui pytest): 10 item galeri dan
       10 berkas PNG dari video uji 10 detik.
 - [x] Simulasi tanpa ffmpeg (folder `third_party/ffmpeg/bin` dinonaktifkan):
-      97 tes, 8 dilewati, 89 lulus; jalur OpenCV termasuk GUI tetap bekerja.
+      111 tes, 9 dilewati, 102 lulus; jalur OpenCV termasuk GUI tetap bekerja.
 - [x] Konfigurasi `.github/workflows/release.yml` lolos parse YAML lokal.
 - [ ] Workflow GitHub Actions benar-benar dijalankan pada Linux/macOS.
       **BELUM** — belum ada repositori/runner/kredensial GitHub.
