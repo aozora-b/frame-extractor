@@ -8,12 +8,12 @@ Aplikasi desktop untuk mengambil frame dari video menjadi PNG atau JPG, dengan a
 
 Aset rilis tersedia di halaman **Releases** repositori ini:
 
-| Platform | Berkas | Keterangan |
+| Platform | Berkas | Status / Keterangan |
 |---|---|---|
-| Windows x64 | `frame-extractor-v1.0.0-windows-x64.zip` | Utama (`--onedir`), ffmpeg LGPL disertakan |
-| Windows x64 | `frame-extractor-v1.0.0-windows-x64-onefile.zip` | Alternatif satu berkas; startup lebih lambat |
-| Linux x64 | `frame-extractor-v1.0.0-linux-x64.tar.gz` | `--onedir`, ffmpeg LGPL disertakan |
-| macOS arm64 | `frame-extractor-v1.0.0-macos-arm64.zip` | Aplikasi `.app`; memakai mesin OpenCV |
+| Windows x64 | `frame-extractor-v1.0.0-windows-x64.zip` | **Tersedia** — Utama (`--onedir`), ffmpeg LGPL disertakan |
+| Windows x64 | `frame-extractor-v1.0.0-windows-x64-onefile.zip` | **Tersedia** — Alternatif portabel satu berkas |
+| Linux x64 | *Belum tersedia* | Direncanakan (belum diuji di lingkungan Linux) |
+| macOS arm64 | *Belum tersedia* | Direncanakan (belum diuji di lingkungan macOS) |
 | Semua | `SHA256SUMS.txt` | Checksum SHA-256 untuk verifikasi unduhan |
 
 Nama arsip mengikuti versi rilis dan platform, sehingga laporan bug dapat
@@ -21,7 +21,7 @@ langsung dikaitkan dengan artefak yang dipakai.
 
 Ekstrak arsip, lalu jalankan `Frame Extractor` (Windows: `Frame Extractor.exe`). Tidak perlu memasang Python atau ffmpeg. Biner belum ditandatangani secara digital; Windows SmartScreen dapat meminta konfirmasi. Verifikasi unduhan dengan `SHA256SUMS.txt`.
 
-Status build lokal Windows: `--onedir` 573,0 MiB (ZIP 242,1 MB) dan `--onefile` 230,0 MiB (ZIP 240,4 MB). Linux dan macOS dibangun oleh workflow rilis.
+Saat ini rilis biner resmi baru diuji dan tersedia untuk **Windows x64** (`--onedir` ZIP 242,1 MB dan `--onefile` ZIP 240,4 MB). Dukungan untuk Linux dan macOS masih dalam tahap perencanaan pengujian.
 
 ## Pakai dalam tiga langkah
 
