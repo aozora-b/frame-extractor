@@ -80,14 +80,16 @@ def _build_command(
     command += [
         "-i",
         str(info.path),
-        "-t",
-        f"{span:.6f}",
         "-map",
         "0:v:0",
         "-an",
         "-sn",
+        # Jangan batasi dengan -t: fps filter butuh EOF untuk mengeluarkan
+        # frame terakhir ketika durasi bukan kelipatan interval. round=up
+        # memilih frame pada/tepat setelah tiap titik sampel sehingga frame
+        # terakhir tidak hilang; jumlah output tetap dibatasi -frames:v.
         "-vf",
-        f"fps={fps:.9f}",
+        f"fps={fps:.9f}:round=up",
         "-frames:v",
         str(len(points)),
     ]

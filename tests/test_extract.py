@@ -49,6 +49,26 @@ def test_ffmpeg_extracts_ten_frames(
 
 
 @pytest.mark.integration
+def test_ffmpeg_interval_keeps_last_frame_on_non_multiple_duration(
+    test_video: Path, tmp_path: Path, require_ffmpeg: None
+) -> None:
+    """Regresi: fps filter tidak boleh membuang titik terakhir di 9 detik."""
+
+    info = _info(test_video)
+    results = extract_ffmpeg(
+        info,
+        ExtractOptions(
+            mode="interval",
+            interval_s=3.0,
+            out_dir=tmp_path / "batas-interval",
+        ),
+    )
+    assert len(results) == 4
+    assert [round(result.timestamp_s, 3) for result in results] == [0.0, 3.0, 6.0, 9.0]
+    assert all(result.path.is_file() for result in results)
+
+
+@pytest.mark.integration
 def test_pixel_content_matches_second(
     test_video: Path, tmp_path: Path, require_ffmpeg: None
 ) -> None:
