@@ -49,3 +49,29 @@ def test_settings_panel_scrolls_when_height_is_limited(qt_app) -> None:
     finally:
         panel.close()
         qt_app.processEvents()
+
+
+@pytest.mark.gui
+def test_settings_panel_stays_visible_in_small_window(qt_app, tmp_path: Path) -> None:
+    from PySide6.QtCore import QPoint, QSettings
+
+    from frame_extractor.ui.main_window import MainWindow
+
+    settings = QSettings(
+        str(tmp_path / "settings.ini"),
+        QSettings.Format.IniFormat,
+    )
+    window = MainWindow(settings=settings)
+    window.resize(800, 500)
+    window.show()
+    qt_app.processEvents()
+    try:
+        panel = window.settings_panel
+        panel_left = panel.mapTo(window, QPoint(0, 0)).x()
+        assert panel_left >= 0
+        assert panel_left + panel.width() <= window.width()
+        assert panel.scroll_area.verticalScrollBar().maximum() > 0
+        assert panel.start_button.isVisible()
+    finally:
+        window.close()
+        qt_app.processEvents()

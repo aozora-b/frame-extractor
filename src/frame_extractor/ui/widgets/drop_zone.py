@@ -63,7 +63,7 @@ class DropZone(QFrame):
         self.setAcceptDrops(True)
         self.setCursor(Qt.CursorShape.PointingHandCursor)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setMinimumHeight(360)
+        self.setMinimumHeight(320)
         self.setAccessibleName("Zona jatuh berkas video")
         self.setAccessibleDescription(
             "Jatuhkan berkas video atau folder ke sini, atau tekan Enter untuk memilih berkas."
@@ -84,6 +84,7 @@ class DropZone(QFrame):
         title = QLabel("Jatuhkan video atau folder di sini")
         title.setObjectName("BrandTitle")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setWordWrap(True)
         layout.addWidget(title)
 
         subtitle = QLabel("atau klik area ini untuk memilih berkas dari komputer")

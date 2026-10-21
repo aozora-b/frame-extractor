@@ -82,7 +82,7 @@ class MainWindow(QMainWindow):
         self.settings = settings or QSettings()
         self.setWindowTitle(APP_NAME)
         self.setWindowIcon(app_icon())
-        self.setMinimumSize(980, 640)
+        self.setMinimumSize(800, 500)
         self.resize(1180, 780)
         self.setAcceptDrops(True)
 
